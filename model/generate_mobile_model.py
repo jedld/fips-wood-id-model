@@ -9,7 +9,7 @@ import torch.nn as nn
 import model
 import image_augmentations as ia
 
-classifier, classnames = model.get('class_labels.txt','wts2.pth')
+classifier, classnames = model.get('class_labels.txt','wts.pth')
 classifier.eval()
 
 image = Image.open('../imgdb/Test/Acacia auriculiformis/Auri.5x.FPRDI.Authentic (1-1).jpg')
