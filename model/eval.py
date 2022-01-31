@@ -30,9 +30,18 @@ xfm_test = transforms.Compose([
                           transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 
-test_dataset = datasets.ImageFolder(root='..\\imgdb\\Test', transform=xfm_test)
+xfm_test2 = transforms.Compose([
+                            transforms.Resize(resize_size),
+                            transforms.ToTensor(),
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])                            
 
-testloader = torch.utils.data.DataLoader(test_dataset, batch_size=10, num_workers=0)
+
+
+test_dataset = datasets.ImageFolder(root='../imgdb/Test', transform=xfm_test)
+test_dataset2 = datasets.ImageFolder(root='../imgdb/Test_Square', transform=xfm_test2)
+fused_testset = torch.utils.data.ConcatDataset([test_dataset, test_dataset2])
+
+testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=0)
 
 classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes))
 
@@ -74,7 +83,7 @@ inputs, classes = next(iter(testloader))
 # Make a grid from batch
 out = torchvision.utils.make_grid(inputs)
 
-imshow(out, title=[test_dataset.classes[x] for x in classes])
+# imshow(out, title=[test_dataset.classes[x] for x in classes])
 
 def test_model(epoch):
   test_loss = 0.0

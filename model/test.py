@@ -7,11 +7,12 @@ import data
 import torch.nn as nn
 import model
 import image_augmentations as ia
+import sys
 
 classifier, classnames = model.get('class_labels.txt','wts2.pth')
 classifier.eval()
 
-image = Image.open('..\\imgdb\\Train\\Hevea brasiliensis\\capture_20211021081401.jpg')
+image = Image.open(sys.argv[1])
 divfac = 4
 resize_size = (2048//divfac, 2048//divfac)
 # xfm = transforms.Compose([ia.PadToEnsureSize(out_size=(2048, 2048)),

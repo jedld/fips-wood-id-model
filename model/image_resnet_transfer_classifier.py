@@ -45,7 +45,8 @@ class ImageResNetTransferClassifier(_BaseModel):
                    'resnet34': models.resnet34,
                    'resnet50': models.resnet50,
                    'resnet101': models.resnet101,
-                   'resnet152': models.resnet152}
+                   'resnet152': models.resnet152,
+                   'resnet18_quant' : models.quantization.resnet18}
         lyrs = list(resnets[arch](pretrained=True).children())[:num_blocks]
         self.body = nn.Sequential(*lyrs)
 
