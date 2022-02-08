@@ -15,7 +15,7 @@ default_head_params = {'concat_pool': True,
                        'dropout_prob2': 0.5}
 class ImageResNetTransferClassifier(_BaseModel):
     def __init__(self,
-                 body_arch='resnet34',
+                 body_arch='resnet18',
                  body_num_blocks=8,
                  num_classes=2,
                  head_params=default_head_params):

@@ -63,8 +63,8 @@ print("Building mobile asset archive...")
 x = datetime.datetime.now()
 model_version = x.strftime('%Y%m%d%H%M%S')
 model_info = {
-  'name' : 'wood-id-model',
-  'description' : 'wood id model',
+  'name' : 'resnet-18-8-class',
+  'description' : '8 class resnet18',
   'version' : model_version,
   'pytorch' : torch.__version__,
   'input_dimension' : input.shape

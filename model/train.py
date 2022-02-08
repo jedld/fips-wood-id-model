@@ -16,7 +16,7 @@ import numpy as np
 from pathlib import Path
 
 def main():
-  batch_size = 20
+  batch_size = 10
   divfac = 4
   resize_size = (2048//divfac, 2048//divfac)
 
@@ -61,17 +61,36 @@ def main():
 
   # xfm = transforms.Compose([transforms.ToTensor()])
 
-  train_dataset = datasets.ImageFolder(root='../imgdb/Train', transform=xfm)
-  train_dataset2 = datasets.ImageFolder(root='../imgdb/Train', transform=xfm2)
-  train_dataset3 = datasets.ImageFolder(root='../imgdb/Train_Square', transform=xfm3)
-  test_dataset = datasets.ImageFolder(root='../imgdb/Test', transform=xfm_test)
-  test_dataset2 = datasets.ImageFolder(root='../imgdb/Test_Square', transform=xfm_test2)
+  # train_dataset = datasets.ImageFolder(root='../imgdb/Train', transform=xfm)
+  # train_dataset2 = datasets.ImageFolder(root='../imgdb/Train', transform=xfm2)
+  # train_dataset3 = datasets.ImageFolder(root='../imgdb/Train_Square', transform=xfm3)
+  # test_dataset = datasets.ImageFolder(root='../imgdb/Test', transform=xfm_test)
+  # test_dataset2 = datasets.ImageFolder(root='../imgdb/Test_Square', transform=xfm_test2)
 
-  fused_trainset = torch.utils.data.ConcatDataset([train_dataset, train_dataset2, train_dataset3])
-  fused_testset = torch.utils.data.ConcatDataset([test_dataset, test_dataset2])
+  # fused_trainset = torch.utils.data.ConcatDataset([train_dataset, train_dataset2, train_dataset3])
+  # fused_testset = torch.utils.data.ConcatDataset([test_dataset, test_dataset2])
+
+  
+  # trainloader = torch.utils.data.DataLoader(fused_trainset, batch_size=batch_size,
+  #                                           shuffle=True, num_workers=2)
+  # testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=2)
+
+
+
+  train_dataset = datasets.ImageFolder(root='../imgdb2/Train', transform=xfm3)
+
+  test_dataset = datasets.ImageFolder(root='../imgdb2/Test', transform=xfm_test2)
+
+  fused_trainset = torch.utils.data.ConcatDataset([train_dataset])
+  fused_testset = torch.utils.data.ConcatDataset([test_dataset])
+
+  
   trainloader = torch.utils.data.DataLoader(fused_trainset, batch_size=batch_size,
                                             shuffle=True, num_workers=2)
   testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=2)
+
+
+
   total_classes = len(train_dataset.classes)
   print('Total classes %s' % (total_classes ))
   classifier = ImageResNetTransferClassifier(num_classes=total_classes)
@@ -104,7 +123,7 @@ def main():
 
   criterion = nn.CrossEntropyLoss()
 
-  optimizer = optim.RAdam(classifier.parameters())
+  optimizer = optim.SGD(classifier.parameters(), lr=0.0001, momentum=0.9)
 
 
   def imshow(inp, title=None):
@@ -194,10 +213,10 @@ def main():
           # print statistics
           running_loss += loss.item()
           # print every 10 mini-batches
-          if (i % 10 == 9):
-            print('[%d, %5d] loss: %.3f acc: %.3f best: %.3f ' %
-                  (epoch + 1, i + 1, running_loss / 10, success / (success + failure), best_accuracy))
-            running_loss = 0.0
+
+          print('[%d, %5d] loss: %.3f acc: %.3f best: %.3f ' %
+                (epoch + 1, i + 1, running_loss / 10, success / (success + failure), best_accuracy))
+          running_loss = 0.0
 
       accuracy = test_model(epoch)
       if (accuracy > best_accuracy):
