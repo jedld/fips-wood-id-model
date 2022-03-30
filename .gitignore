@@ -1,3 +1,4 @@
-*.png
-*.jpg
-*.zip
+**/.DS_Store
+imgdb/**/*.png
+imgdb/**/*.jpg
+imgdb/**/*.zip
