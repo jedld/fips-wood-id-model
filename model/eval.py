@@ -37,11 +37,11 @@ xfm_test2 = transforms.Compose([
 
 
 
-test_dataset = datasets.ImageFolder(root='../imgdb/Test', transform=xfm_test)
-test_dataset2 = datasets.ImageFolder(root='../imgdb/Test_Square', transform=xfm_test2)
-fused_testset = torch.utils.data.ConcatDataset([test_dataset, test_dataset2])
+test_dataset = datasets.ImageFolder(root='../imgdb2/Test', transform=xfm_test2)
 
-testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=0)
+
+
+testloader = torch.utils.data.DataLoader(test_dataset, batch_size=10, num_workers=0)
 
 classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes))
 

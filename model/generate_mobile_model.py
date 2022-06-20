@@ -12,6 +12,9 @@ import csv
 import json
 import zipfile
 import datetime
+import os
+
+
 
 
 classifier, classnames = model.get('class_labels.txt','wts2.pth')
@@ -55,19 +58,19 @@ with open('species_database.csv') as csv_file:
           }
   print(f'Processed {line_count} lines.')
 
-with open('species_database.json', 'w') as outfile:
-  json.dump(database_content, outfile, indent=2)
+
 
 print("Building mobile asset archive...")
 
 x = datetime.datetime.now()
 model_version = x.strftime('%Y%m%d%H%M%S')
 model_info = {
-  'name' : 'resnet-18-8-class',
-  'description' : '8 class resnet18',
+  'name' : 'resnet-18-31-class',
+  'description' : '31 class resnet50 Wood Model V5',
   'version' : model_version,
   'pytorch' : torch.__version__,
-  'input_dimension' : input.shape
+  'input_dimension' : input.shape,
+  'accuracy_cutoff' : 4.0
 }
 
 with open('model.json', 'w') as outfile:
@@ -79,6 +82,31 @@ zipf.write('fips_wood_model_mobile.pt', 'model.pt')
 zipf.write('model.txt','model.txt')
 zipf.write('model.json','model.json')
 zipf.write('class_labels.txt','labels.txt')
+
+reference_images = []
+print(database_content.keys())
+for subdir, dirs, files in os.walk('reference'):
+  for file in files:
+    #print os.path.join(subdir, file)
+    filepath = subdir + os.sep + file
+    reference_images.append([filepath, filepath.replace(' ', '_')])
+    class_name = subdir.lower().replace(' ', '_').replace('reference/', '')
+    if class_name not in database_content:
+      print(f"{class_name} is not in the species_database.csv file!")
+    else:
+      content_detail = database_content[class_name]
+
+      if 'reference_images' not in content_detail:
+        content_detail['reference_images'] = []
+
+      content_detail['reference_images'].append(filepath.replace(' ', '_'))
+
+with open('species_database.json', 'w') as outfile:
+  json.dump(database_content, outfile, indent=2)
+
+for filepath, transformed_filepath in reference_images:
+  zipf.write(filepath, transformed_filepath)
+
 zipf.close()
 
 print(f"model written to model-{model_version}.zip")
