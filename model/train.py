@@ -232,3 +232,4 @@ def main():
 
 main()
 
+# report on the F1 and accuracy scores 

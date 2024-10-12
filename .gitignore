@@ -2,3 +2,5 @@
 imgdb/**/*.png
 imgdb/**/*.jpg
 imgdb/**/*.zip
+app/tmp/**
+app/__pycache__
