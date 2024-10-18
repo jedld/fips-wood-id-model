@@ -4,3 +4,4 @@ imgdb/**/*.jpg
 imgdb/**/*.zip
 app/tmp/**
 app/__pycache__
+data/

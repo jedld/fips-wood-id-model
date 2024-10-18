@@ -1,1 +1,8 @@
 torch
+torchvision
+sympy
+pytz
+six
+pyparsing
+cycler
+kiwisolver

@@ -7,13 +7,22 @@ import data
 import torch.nn as nn
 import model
 import torchvision
-from torchvision import *
+from torchvision.datasets import ImageFolder
 import image_augmentations as ia
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+import sys
+
+# Default values
+default_test_folder = '../imgdb2/Test'
+default_weights_file = './wts2.pth'
+
+# Command-line arguments
+test_folder = sys.argv[1] if len(sys.argv) > 1 else default_test_folder
+weights_file = sys.argv[2] if len(sys.argv) > 2 else default_weights_file
 
 batch_size = 35
 divfac = 4
@@ -33,13 +42,10 @@ xfm_test = transforms.Compose([
 xfm_test2 = transforms.Compose([
                             transforms.Resize(resize_size),
                             transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])                            
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 
-
-test_dataset = datasets.ImageFolder(root='../imgdb2/Test', transform=xfm_test2)
-
-
+test_dataset = ImageFolder(root=test_folder, transform=xfm_test2)
 
 testloader = torch.utils.data.DataLoader(test_dataset, batch_size=10, num_workers=0)
 
@@ -47,10 +53,8 @@ classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes)
 
 print(test_dataset.classes)
 
-PATH = './wts2.pth'
-
-if Path(PATH).exists():
-  classifier.load_weights(Path(PATH))
+if Path(weights_file).exists():
+  classifier.load_weights(Path(weights_file))
 
 # get some random training images
 dataiter = iter(testloader)
@@ -91,7 +95,7 @@ def test_model(epoch):
   success = 0
   failure = 0
   classifier.eval()
-  for i, data in enumerate(testloader):
+  for _, data in enumerate(testloader):
       # get the inputs; data is a list of [inputs, labels]
       inputs, labels = data[0].to(device), data[1].to(device)
       label_indexes = data[1].numpy()

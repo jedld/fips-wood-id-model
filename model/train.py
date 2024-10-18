@@ -7,7 +7,7 @@ import data
 import torch.nn as nn
 import model
 import torchvision
-from torchvision import *
+from torchvision import datasets
 import image_augmentations as ia
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
@@ -26,65 +26,26 @@ def main():
 
   print("threads %d" % (torch.get_num_threads()))
 
-  xfm = transforms.Compose([
-                            transforms.transforms.RandomRotation(270),
-                            transforms.CenterCrop((2048,2048)),
-                            transforms.Resize(resize_size),
-                            transforms.transforms.RandomVerticalFlip(),
-                            transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
-  xfm2 = transforms.Compose([
-                            transforms.RandomCrop((2048,2048)),
-                            transforms.Resize(resize_size),
-                            transforms.transforms.RandomVerticalFlip(),
-                            transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
   xfm3 = transforms.Compose([
                             transforms.Resize(resize_size),
-                            transforms.transforms.RandomRotation(270),
-                            transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
-
-  xfm_test = transforms.Compose([
-                            transforms.RandomCrop((2048,2048)),
-                            transforms.Resize(resize_size),
+                            transforms.RandomRotation(270),
                             transforms.ToTensor(),
                             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
   xfm_test2 = transforms.Compose([
                             transforms.Resize(resize_size),
                             transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])                            
-
-  # xfm = transforms.Compose([transforms.ToTensor()])
-
-  # train_dataset = datasets.ImageFolder(root='../imgdb/Train', transform=xfm)
-  # train_dataset2 = datasets.ImageFolder(root='../imgdb/Train', transform=xfm2)
-  # train_dataset3 = datasets.ImageFolder(root='../imgdb/Train_Square', transform=xfm3)
-  # test_dataset = datasets.ImageFolder(root='../imgdb/Test', transform=xfm_test)
-  # test_dataset2 = datasets.ImageFolder(root='../imgdb/Test_Square', transform=xfm_test2)
-
-  # fused_trainset = torch.utils.data.ConcatDataset([train_dataset, train_dataset2, train_dataset3])
-  # fused_testset = torch.utils.data.ConcatDataset([test_dataset, test_dataset2])
-
-  
-  # trainloader = torch.utils.data.DataLoader(fused_trainset, batch_size=batch_size,
-  #                                           shuffle=True, num_workers=2)
-  # testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=2)
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 
+  train_dataset = datasets.ImageFolder(root='data/train', transform=xfm3)
 
-  train_dataset = datasets.ImageFolder(root='../imgdb2/Train', transform=xfm3)
-
-  test_dataset = datasets.ImageFolder(root='../imgdb2/Test', transform=xfm_test2)
+  test_dataset = datasets.ImageFolder(root='data/test', transform=xfm_test2)
 
   fused_trainset = torch.utils.data.ConcatDataset([train_dataset])
   fused_testset = torch.utils.data.ConcatDataset([test_dataset])
 
-  
+
   trainloader = torch.utils.data.DataLoader(fused_trainset, batch_size=batch_size,
                                             shuffle=True, num_workers=2)
   testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=2)
@@ -108,7 +69,7 @@ def main():
 
   # get some random training images
   dataiter = iter(trainloader)
-  images, labels = dataiter.next()
+  images, labels = next(dataiter)
 
   # show images
   print(' '.join('%5s' % train_dataset.classes[labels[j]] for j in range(batch_size)))
@@ -169,7 +130,6 @@ def main():
             if  expected == actual:
               success+=1
             else:
-              print("%s -> %s" % (expected, actual))
               failure+=1
 
     print('Test [%d] loss: %.3f Success: %d Failure: %d Accuracy: %.3f Total: %d' %
@@ -179,7 +139,6 @@ def main():
   best_accuracy = test_model(0)
 
   # Start model training
-
   for epoch in range(100):  # loop over the dataset multiple times
       running_loss = 0.0
       classifier.train()

@@ -2,7 +2,6 @@ acacia auriculiformis
 acacia mangium
 acer saccharum
 dipterocarpus grandiflorus
-endospermum peltatum
 eucalyptus camaldulensis
 falcataria falcata
 fraxinus americana
@@ -23,7 +22,6 @@ shorea astylosa
 shorea contorta
 shorea negrosensis
 shorea ovata
-shorea palosapis
 shorea parvifolia
 shorea polysperma
 swietenia macrophylla

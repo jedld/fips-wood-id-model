@@ -4,7 +4,7 @@ from torchvision.transforms import functional as tvf
 import math
 import random
 import PIL
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter, PILLOW_VERSION
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import numpy as np
 import pandas as pd
 from scipy.ndimage.interpolation import map_coordinates
