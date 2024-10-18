@@ -62,7 +62,7 @@ def main():
 
   print(train_dataset.classes)
 
-  PATH = './wts2.pth'
+  PATH = './checkpoint.pth'
 
   if Path(PATH).exists():
     classifier.load_weights(Path(PATH))
@@ -113,7 +113,7 @@ def main():
     success = 0
     failure = 0
     classifier.eval()
-    for i, data in enumerate(testloader):
+    for _, data in enumerate(testloader):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data[0].to(device), data[1].to(device)
         label_indexes = data[1].numpy()

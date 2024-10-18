@@ -3,5 +3,8 @@ imgdb/**/*.png
 imgdb/**/*.jpg
 imgdb/**/*.zip
 app/tmp/**
+model/*.pt
 app/__pycache__
 data/
+*.pth
+*.pt
