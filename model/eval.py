@@ -17,14 +17,22 @@ from pathlib import Path
 import sys
 from sklearn.metrics import confusion_matrix, classification_report
 import seaborn as sns
+from optparse import OptionParser
+from stn_model import MinimalCNN
+from torchsummary import summary
+
+# Command-line options
+parser = OptionParser()
+parser.add_option("-t", "--test_folder", dest="test_folder", default="data/test",
+                  help="path to the test folder", metavar="FOLDER")
+parser.add_option("-w", "--weights_file", dest="weights_file", default="checkpoint.pth",
+                  help="path to the model weights file", metavar="FILE")
+
+(options, args) = parser.parse_args()
 
 # Default values
-default_test_folder = 'data/test'
-default_weights_file = 'model.pt'
-
-# Command-line arguments
-test_folder = sys.argv[1] if len(sys.argv) > 1 else default_test_folder
-weights_file = sys.argv[2] if len(sys.argv) > 2 else default_weights_file
+test_folder = options.test_folder
+weights_file = options.weights_file
 
 batch_size = 35
 divfac = 4
@@ -47,7 +55,9 @@ test_dataset = ImageFolder(root=test_folder, transform=xfm_test2)
 
 testloader = torch.utils.data.DataLoader(test_dataset, batch_size=10, num_workers=0)
 
+# classifier = MinimalCNN(num_classes=len(test_dataset.classes))
 classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes))
+
 
 print(test_dataset.classes)
 
@@ -58,10 +68,13 @@ if Path(weights_file).exists():
   else:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     classifier.load_weights(Path(weights_file))
+else:
+  print("Weights file not found: ", weights_file)
+  sys.exit(1)
 
 
 print(device)
-
+# summary(classifier, input_size=(3, 512, 512))
 # get some random training images
 dataiter = iter(testloader)
 images, labels = next(dataiter)
@@ -150,6 +163,9 @@ def test_model(epoch):
   # Compute and print classification report
   report = classification_report(all_labels, all_preds, target_names=test_dataset.classes)
   print("Classification Report:\n", report)
+  # write report to file
+  with open("classification_report.txt", "w") as file:
+    file.write(report)
   
   return accuracy
 

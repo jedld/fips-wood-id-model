@@ -1,31 +1,31 @@
-acacia auriculiformis
-acacia mangium
-acer saccharum
-dipterocarpus grandiflorus
-endospermum peltatum
-eucalyptus camaldulensis
-falcataria falcata
-fraxinus americana
-gmelina arborea
-hevea brasiliensis
-instia bijuga
-juglans nigra
-juglans regia
-leucaena leucocephala
+acacia_auriculiformis
+acacia_mangium
+acer_saccharum
+dipterocarpus_grandiflorus
+endospermum_peltatum
+eucalyptus_camaldulensis
+falcataria_falcata
+fraxinus_americana
+gmelina_arborea
+hevea_brasiliensis
+instia_bijuga
+juglans_nigra
+juglans_regia
+leucaena_leucocephala
 palosapis
-parashorea malaanonan
-pometia pinnata
-pterocarpus indicus
-quercus robur
-samanea saman
-shorea albida
-shorea astylosa
-shorea contorta
-shorea negrosensis
-shorea ovata
-shorea palosapis
-shorea parvifolia
-shorea polysperma
-swietenia macrophylla
-tectona grandis
-vitex parviflora
+parashorea_malaanonan
+pometia_pinnata
+pterocarpus_indicus
+quercus_robur
+samanea_saman
+shorea_albida
+shorea_astylosa
+shorea_contorta
+shorea_negrosensis
+shorea_ovata
+shorea_palosapis
+shorea_parvifolia
+shorea_polysperma
+swietenia_macrophylla
+tectona_grandis
+vitex_parviflora

@@ -8,3 +8,7 @@ app/__pycache__
 data/
 *.pth
 *.pt
+
+
+# tensorboard
+runs/

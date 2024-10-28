@@ -6,6 +6,8 @@ from torch.autograd import Variable
 import data
 import torch.nn as nn
 import model
+from stn_model import MinimalCNN
+from Resnet18 import ResNet18
 import torchvision
 from torchvision import datasets
 import image_augmentations as ia
@@ -14,26 +16,39 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+from torch.utils.tensorboard import SummaryWriter
+from torchsummary import summary
+from custom_transforms import ResizeWithPadding
+from torch.optim import lr_scheduler
 
 def main():
-  batch_size = 10
+  batch_size = 32
   divfac = 4
-  resize_size = (2048//divfac, 2048//divfac)
+  best_epoch = 0
+  MAX_EPOCHS = 100
+  NUM_WORKERS = 8
+  NUM_WORKERS_TEST = 2
 
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   print(device)
 
+  # set random seed
+  torch.manual_seed(1337)
+
   print("threads %d" % (torch.get_num_threads()))
 
   xfm3 = transforms.Compose([
-                            transforms.Resize(resize_size),
+                            ResizeWithPadding(512),
                             transforms.RandomRotation(270),
+                            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
                             transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                            transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3), value='random')
+                            ])
 
   xfm_test2 = transforms.Compose([
-                            transforms.Resize(resize_size),
+                            transforms.Resize((512, 512)),
                             transforms.ToTensor(),
                             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
@@ -47,14 +62,15 @@ def main():
 
 
   trainloader = torch.utils.data.DataLoader(fused_trainset, batch_size=batch_size,
-                                            shuffle=True, num_workers=2)
-  testloader = torch.utils.data.DataLoader(fused_testset, batch_size=10, num_workers=2)
-
-
+                                            shuffle=True, num_workers=NUM_WORKERS)
+  testloader = torch.utils.data.DataLoader(fused_testset, batch_size=batch_size, num_workers=NUM_WORKERS_TEST)
 
   total_classes = len(train_dataset.classes)
   print('Total classes %s' % (total_classes ))
+
+  # classifier = MinimalCNN(total_classes)
   classifier = ImageResNetTransferClassifier(num_classes=total_classes)
+  # classifier = ResNet18(num_classes=total_classes)
 
 
   if (train_dataset.classes != test_dataset.classes):
@@ -65,6 +81,7 @@ def main():
   PATH = './checkpoint.pth'
 
   if Path(PATH).exists():
+    print('loading weights')
     classifier.load_weights(Path(PATH))
 
   # get some random training images
@@ -82,10 +99,12 @@ def main():
 
   classifier = classifier.to(device)
 
-  criterion = nn.CrossEntropyLoss()
+  criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
-  optimizer = optim.SGD(classifier.parameters(), lr=0.0001, momentum=0.9)
-
+  optimizer = optim.AdamW(classifier.parameters(), lr=0.0001, weight_decay=0.0005)
+  # scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
+  # Initialize TensorBoard writer
+  writer = SummaryWriter()
 
   def imshow(inp, title=None):
       """Imshow for Tensor."""
@@ -105,7 +124,12 @@ def main():
   # Make a grid from batch
   out = torchvision.utils.make_grid(inputs)
 
-  # imshow(out, title=[train_dataset.classes[x] for x in classes])
+  # Log images to TensorBoard
+  writer.add_image('Train Images', out)
+
+  # Print model summary
+  summary(classifier, input_size=(3, 512, 512))
+
 
   def test_model(epoch):
     test_loss = 0.0
@@ -113,6 +137,8 @@ def main():
     success = 0
     failure = 0
     classifier.eval()
+    all_labels = []
+    all_preds = []
     for _, data in enumerate(testloader):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data[0].to(device), data[1].to(device)
@@ -127,43 +153,42 @@ def main():
             topk = torch.topk(out, len(test_dataset.classes))
             expected = test_dataset.classes[label_indexes[i2]]
             actual = test_dataset.classes[topk.indices.cpu().numpy()[0]]
+            all_labels.append(expected)
+            all_preds.append(actual)
             if  expected == actual:
               success+=1
             else:
               failure+=1
 
+    accuracy = success / (success + failure)
     print('Test [%d] loss: %.3f Success: %d Failure: %d Accuracy: %.3f Total: %d' %
-                (epoch + 1, test_loss / total_items, success, failure, success / (success + failure), success + failure))
-    return success / (success + failure)
+                (epoch + 1, test_loss / total_items, success, failure, accuracy, success + failure))
+    
+    # Log test metrics to TensorBoard
+    writer.add_scalar('Test/Loss', test_loss / total_items, epoch)
+    writer.add_scalar('Test/Accuracy', accuracy, epoch)
+    
+    # Log test images to TensorBoard
+    out = torchvision.utils.make_grid(inputs)
+    writer.add_image('Test Images', out, epoch)
+    
+    return accuracy
 
   best_accuracy = test_model(0)
 
   # Start model training
-  for epoch in range(100):  # loop over the dataset multiple times
+  for epoch in range(MAX_EPOCHS):  # loop over the dataset multiple times
       running_loss = 0.0
       classifier.train()
       success = 0
       failure = 0
-      for i, data in enumerate(trainloader, 0):
+      for i, row_data in enumerate(trainloader, 0):
           # get the inputs; data is a list of [inputs, labels]
-          inputs, labels = data[0].to(device), data[1].to(device)
+          inputs, labels = row_data[0].to(device), row_data[1].to(device)
 
           # zero the parameter gradients
           optimizer.zero_grad()
-
-          # forward + backward + optimize
           outputs = classifier(inputs)
-        
-          label_indexes = data[1].numpy()
-          for i2, out in enumerate(outputs):
-            topk = torch.topk(out, len(train_dataset.classes))
-            expected = train_dataset.classes[label_indexes[i2]]
-            actual = train_dataset.classes[topk.indices.cpu().numpy()[0]]
-            if expected == actual:
-              success+=1
-            else:
-              failure+=1
-
 
           loss = criterion(outputs, labels)
           loss.backward()
@@ -173,22 +198,23 @@ def main():
           running_loss += loss.item()
           # print every 10 mini-batches
 
-          print('[%d, %5d] loss: %.3f acc: %.3f best: %.3f ' %
-                (epoch + 1, i + 1, running_loss / 10, success / (success + failure), best_accuracy))
+          print('[%d, %5d]  loss: %.3f best: %.3f@%d ' %
+                (epoch + 1, i + 1, running_loss / 10,  best_accuracy, best_epoch))
+          # Log training metrics to TensorBoard
+          writer.add_scalar('Train/Loss', running_loss / 10, epoch * len(trainloader) + i)
           running_loss = 0.0
-
+      # scheduler.step()
       accuracy = test_model(epoch)
       if (accuracy > best_accuracy):
+        best_accuracy = accuracy
+        best_epoch = epoch
         print("best accuracy %f" % (accuracy))
         best_accuracy = accuracy
         classifier.save_weights(PATH)
         with open('model.txt', 'w') as the_file:
           the_file.write('%.3f' % (accuracy))
 
-
   print('Finished Training. Best accuracy %.3f' % (best_accuracy))
-
+  writer.close()
 
 main()
-
-# report on the F1 and accuracy scores 

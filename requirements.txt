@@ -6,3 +6,4 @@ six
 pyparsing
 cycler
 kiwisolver
+tensorboard
