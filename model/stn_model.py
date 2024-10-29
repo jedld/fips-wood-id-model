@@ -16,7 +16,7 @@ class MinimalCNN(nn.Module):
         self.conv5 = nn.Conv2d(256, 512, 5, stride=2, padding=2)
         self.bn5 = nn.BatchNorm2d(512)
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-        
+
         # Adjusted input size for fc1 to match concatenated features
         self.fc1 = nn.Linear(32 + 64 + 128 + 256 + 512, 64)
         self.dropout = nn.Dropout()

@@ -19,8 +19,6 @@ parser.add_option("-m", "--model", dest="model_file", default="wts.pth",
                   help="path to the model weights file", metavar="FILE")
 parser.add_option("-c", "--class_labels", dest="class_labels_file", default="class_labels.txt",
                   help="path to the class labels file", metavar="FILE")
-parser.add_option("-s", "--sample_input", dest="sample_input_file", default="../imgdb/000.png",
-                  help="path to the sample input image file", metavar="FILE")
 parser.add_option("-n", "--name", dest="model_name", default="resnet-18-31-class",
                   help="name of the model", metavar="NAME")
 parser.add_option("-d", "--description", dest="model_description", default="31 class resnet50 Wood Model V5",
@@ -51,8 +49,6 @@ sample_input_file_path = os.path.join(options.path, options.sample_input_file)
 classifier, classnames = load_model(class_labels_file_path, model_file_path, arch=options.model_type)
 classifier.eval()
 
-# Load sample input image
-image = Image.open(sample_input_file_path)
 
 divfac = 4
 resize_size = (2048//divfac, 2048//divfac)
@@ -60,10 +56,9 @@ xfm = transforms.Compose([ia.PadToEnsureSize(out_size=(2048, 2048)),
                           ia.Resize(out_size=resize_size),
                           ia.ToTensor(),
                           ia.ImageNetNormalize()])
-sample = {'image': (image, ia.SampElemType.IMAGE)}
-sample = xfm(sample)
 
-input = sample['image'][0].unsqueeze(0)
+
+input = torch.rand(1, 3, resize_size[0], resize_size[1])
 print("input dimension", input.shape)
 
 # Convert model to TorchScript and optimize for mobile

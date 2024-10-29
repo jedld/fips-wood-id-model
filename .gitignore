@@ -7,7 +7,9 @@ model/*.pt
 app/__pycache__
 data/
 *.pth
-*.pt
+*.
+*.zip
+*.json
 
 
 # tensorboard
