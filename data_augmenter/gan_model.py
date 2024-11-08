@@ -55,7 +55,17 @@ class Generator(nn.Module):
         self.fc = nn.Linear(nz + emb_dimen, 512*4*4)  # Adjusted for 4x4 feature maps
 
         self.main = nn.Sequential(
-            nn.ConvTranspose2d(512, 512, 1, stride=1),
+            nn.ConvTranspose2d(512, 1024, 1, stride=1),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(True),
+
+            # Additional layer
+            nn.ConvTranspose2d(1024, 512, 3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(True),
+
+            # 4x4 -> 8x8
+            nn.ConvTranspose2d(512, 512, 4, stride=2, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(True),
 
@@ -63,44 +73,34 @@ class Generator(nn.Module):
             nn.ConvTranspose2d(512, 256, 3, stride=1, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(True),
-
-            # 4x4 -> 8x8
-            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),
-            nn.BatchNorm2d(128),
+  
+            # 8x8 -> 16x16
+            nn.ConvTranspose2d(256, 256, 4, stride=2, padding=1),
+            nn.BatchNorm2d(256),
             nn.ReLU(True),
 
             # Additional layer
-            nn.ConvTranspose2d(128, 64, 3, stride=1, padding=1),
+            nn.ConvTranspose2d(256, 128, 3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+
+            # 16x16 -> 32x32
+            nn.ConvTranspose2d(128, 128, 4, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+
+            # 32x32 -> 64x64
+            nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(True),
-  
-            # 8x8 -> 16x16
+
+            # 64x64 -> 128x128
             nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(True),
 
-            # Additional layer
-            nn.ConvTranspose2d(64, 32, 3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(True),
-
-            # 16x16 -> 32x32
-            nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(True),
-
-            # 32x32 -> 64x64
-            nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(True),
-
-            # 64x64 -> 128x128
-            nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(True),
-
             # 128x128 -> 256x256
-            nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1),
+            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(True),
 
