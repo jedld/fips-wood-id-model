@@ -44,7 +44,6 @@ model_version = x.strftime('%Y%m%d%H%M%S')
 # Load model and class
 class_labels_file_path = os.path.join(options.path, options.class_labels_file)
 model_file_path = os.path.join(options.path, options.model_file)
-sample_input_file_path = os.path.join(options.path, options.sample_input_file)
 
 classifier, classnames = load_model(class_labels_file_path, model_file_path, arch=options.model_type)
 classifier.eval()
