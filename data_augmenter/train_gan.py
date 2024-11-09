@@ -34,7 +34,7 @@ BATCH_SIZE = 8
 IMAGE_SIZE = 512
 CHANNELS_IMG = 3
 Z_DIM = 100  # Adjusted to match the default in your updated Generator
-NUM_EPOCHS = 10000
+NUM_EPOCHS = 100
 CRITIC_ITERATIONS = 5
 LAMBDA_GP = 10
 
