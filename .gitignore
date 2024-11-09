@@ -5,11 +5,13 @@ imgdb/**/*.zip
 app/tmp/**
 model/*.pt
 app/__pycache__
+data_augmenter/__pycache__
 data/
 *.pth
 *.
 *.zip
 *.json
+.venv/
 
 
 # tensorboard

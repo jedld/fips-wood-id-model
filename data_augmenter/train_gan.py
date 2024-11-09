@@ -66,6 +66,11 @@ loader = DataLoader(
     shuffle=True,
 )
 
+class_labels_path = 'class_labels_generator.txt'
+with open(class_labels_path, 'w') as f:
+    for label in dataset.classes:
+        f.write(f"{label}\n")
+
 # Initialize generator and discriminator
 gen = Generator(nz=Z_DIM, num_classes=num_classes).to(device)
 critic = Discriminator(num_classes=num_classes).to(device)
@@ -79,16 +84,16 @@ opt_critic = optim.Adam(critic.parameters(), lr=CRITIC_LEARNING_RATE, betas=(0.0
 
 # Load models if available
 if os.path.exists(f"best_generator_model.pth"):
-    gen.load_state_dict(torch.load(f"best_generator_model.pth"))
+    gen.load_state_dict(torch.load(f"best_generator_model.pth", weights_only=True))
     if os.path.exists(f"generator_opt.pth"):
-        opt_gen.load_state_dict(torch.load(f"generator_opt.pth"))
+        opt_gen.load_state_dict(torch.load(f"generator_opt.pth", weights_only=True))
 else:
     print("Generator weights not found!")
 
 if os.path.exists(f"best_discriminator_model.pth"):
-    critic.load_state_dict(torch.load(f"best_discriminator_model.pth"))
+    critic.load_state_dict(torch.load(f"best_discriminator_model.pth", weights_only=True))
     if os.path.exists(f"critic_opt.pth"):
-        opt_critic.load_state_dict(torch.load(f"critic_opt.pth"))
+        opt_critic.load_state_dict(torch.load(f"critic_opt.pth", weights_only=True))
 else:
     print("Discriminator weights not found!")
 
