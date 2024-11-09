@@ -28,7 +28,7 @@ import argparse
 device = "cuda" if torch.cuda.is_available() else "cpu"
 CRITIC_LEARNING_RATE = 1e-4
 GENERATOR_LEARNING_RATE = 1e-4
-BATCH_SIZE = 6
+BATCH_SIZE = 8
 IMAGE_SIZE = 512
 CHANNELS_IMG = 3
 Z_DIM = 100  # Adjusted to match the default in your updated Generator
@@ -40,7 +40,7 @@ LAMBDA_GP = 10
 transform = transforms.Compose(
     [
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(degrees=[0, 90, 180, 270]),
         transforms.ToTensor(),
         transforms.Normalize(
             [0.5 for _ in range(CHANNELS_IMG)], [0.5 for _ in range(CHANNELS_IMG)]

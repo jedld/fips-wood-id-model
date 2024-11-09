@@ -14,3 +14,4 @@ data/
 
 # tensorboard
 runs/
+generated_images/
