@@ -40,7 +40,12 @@ LAMBDA_GP = 10
 transform = transforms.Compose(
     [
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        transforms.RandomRotation(degrees=[0, 90, 180, 270]),
+        transforms.RandomChoice([
+            transforms.RandomRotation(degrees=[0]),
+            transforms.RandomRotation(degrees=[90]),
+            transforms.RandomRotation(degrees=[180]),
+            transforms.RandomRotation(degrees=[270])
+        ]),
         transforms.ToTensor(),
         transforms.Normalize(
             [0.5 for _ in range(CHANNELS_IMG)], [0.5 for _ in range(CHANNELS_IMG)]
