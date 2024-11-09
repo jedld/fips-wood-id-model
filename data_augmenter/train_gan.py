@@ -37,14 +37,16 @@ CRITIC_ITERATIONS = 5
 LAMBDA_GP = 10
 
 # Define transformations
+from torchvision.transforms import functional as F
+
 transform = transforms.Compose(
     [
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.RandomChoice([
-            transforms.RandomRotation(degrees=[0]),
-            transforms.RandomRotation(degrees=[90]),
-            transforms.RandomRotation(degrees=[180]),
-            transforms.RandomRotation(degrees=[270])
+            transforms.Lambda(lambda img: F.rotate(img, 0)),
+            transforms.Lambda(lambda img: F.rotate(img, 90)),
+            transforms.Lambda(lambda img: F.rotate(img, 180)),
+            transforms.Lambda(lambda img: F.rotate(img, 270))
         ]),
         transforms.ToTensor(),
         transforms.Normalize(
@@ -52,7 +54,6 @@ transform = transforms.Compose(
         ),
     ]
 )
-
 # Load dataset with labels
 dataset = datasets.ImageFolder(root="data/train", transform=transform)
 num_classes = len(dataset.classes)  # Get number of classes from dataset
