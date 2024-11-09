@@ -12,6 +12,8 @@ import torchvision
 import random
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+import matplotlib
+matplotlib.use('Agg')  # Use a non-interactive backend
 import matplotlib.pyplot as plt
 import os
 import numpy as np
