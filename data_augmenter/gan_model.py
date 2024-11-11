@@ -13,7 +13,7 @@ class Generator(nn.Module):
         self.num_classes = num_classes
         if emb_dimen is None:
             emb_dimen = num_classes
-            
+
         # Label embedding
         self.label_emb = nn.Embedding(num_classes, emb_dimen)
 
@@ -84,40 +84,43 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, emb_dimen=None):
         super(Discriminator, self).__init__()
 
         self.num_classes = num_classes
         # Label embedding
-        self.label_emb = nn.Embedding(num_classes, 64)
+        if emb_dimen is None:
+            emb_dimen = num_classes
+
+        self.label_emb = nn.Embedding(num_classes, emb_dimen)
 
         self.main = nn.Sequential(
             # 64x64 -> 32x32
-            nn.Conv2d(3, 1024, 4, stride=2, padding=1),
+            nn.Conv2d(3, 512, 4, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
 
             #32x32 -> 16x16
-            nn.Conv2d(1024, 512, 4, stride=2, padding=1),
-            nn.InstanceNorm2d(512),
-            nn.LeakyReLU(0.2, inplace=True),
-
-            #16x16 -> 8x8
             nn.Conv2d(512, 256, 4, stride=2, padding=1),
             nn.InstanceNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
 
-            # Additional layer
+            #16x16 -> 8x8
             nn.Conv2d(256, 128, 4, stride=2, padding=1),
             nn.InstanceNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(128, 64, 4, stride=2, padding=1),  # Downsample to 2x2
-            nn.InstanceNorm2d(64),
+            # Additional layer
+            nn.Conv2d(128, 64, 4, stride=2, padding=1),
+            nn.InstanceNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(64, 32, 4, stride=2, padding=1),  # Downsample to 2x2
+            nn.InstanceNorm2d(32),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
         # Final fully connected layer for h(x)
-        self.fc = nn.Linear(64, 1)
+        self.fc = nn.Linear(emb_dimen, 1)
 
     def forward(self, x, labels):
         # Pass input through main network

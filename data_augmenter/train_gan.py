@@ -32,6 +32,7 @@ CRITIC_LEARNING_RATE = 1e-4
 GENERATOR_LEARNING_RATE = 1e-4
 BATCH_SIZE = 8
 IMAGE_SIZE = 512
+EMBED_DIM = 16
 CHANNELS_IMG = 3
 Z_DIM = 100  # Adjusted to match the default in your updated Generator
 NUM_EPOCHS = 100
@@ -72,8 +73,8 @@ with open(class_labels_path, 'w') as f:
         f.write(f"{label}\n")
 
 # Initialize generator and discriminator
-gen = Generator(nz=Z_DIM, num_classes=num_classes).to(device)
-critic = Discriminator(num_classes=num_classes).to(device)
+gen = Generator(nz=Z_DIM, num_classes=num_classes, emb_dimen=EMBED_DIM).to(device)
+critic = Discriminator(num_classes=num_classes, emb_dimen=EMBED_DIM).to(device)
 initialize_weights(gen)
 initialize_weights(critic)
 
