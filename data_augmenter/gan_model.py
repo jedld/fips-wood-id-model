@@ -5,50 +5,15 @@ from torch.nn.utils import spectral_norm
 
 # Implements a conditional SAGAN
 
-class MultiheadSelfAttention(nn.Module):
-    def __init__(self, in_channels, num_heads=8):
-        super(MultiheadSelfAttention, self).__init__()
-
-        assert in_channels % num_heads == 0, "in_channels should be divisible by num_heads"
-        self.head_dim = in_channels // num_heads
-        self.num_heads = num_heads
-        
-        # Query, Key, Value projections
-        self.query = nn.Conv2d(in_channels, in_channels, 1)
-        self.key = nn.Conv2d(in_channels, in_channels, 1)
-        self.value = nn.Conv2d(in_channels, in_channels, 1)
-        
-        # Output projection
-        self.out = nn.Conv2d(in_channels, in_channels, 1)
-        
-        self.gamma = nn.Parameter(torch.zeros(1))
-        self.softmax = nn.Softmax(dim=-1)
-
-    def forward(self, x):
-        B, C, W, H = x.size()
-        
-        # Multi-head split
-        Q = self.query(x).view(B, self.num_heads, self.head_dim, W*H).permute(0, 2, 1, 3)
-        K = self.key(x).view(B, self.num_heads, self.head_dim, W*H).permute(0, 2, 3, 1)
-        V = self.value(x).view(B, self.num_heads, self.head_dim, W*H).permute(0, 2, 1, 3)
-
-
-        # Scaled dot-product attention
-        attn = self.softmax((Q @ K) / (self.head_dim ** 0.5))
-        y = attn @ V
-        y = y.permute(0, 2, 1, 3).contiguous().view(B, C, W, H)
-        
-        # Project back to the original size and add the residual connection
-        out = self.out(self.gamma * y) + x
-        return out
-
 class Generator(nn.Module):
-    def __init__(self, nz=100, num_classes=10, emb_dimen=8):  # nz is the size of the latent vector (noise)
+    def __init__(self, nz=100, num_classes=10, emb_dimen=None):  # nz is the size of the latent vector (noise)
         super(Generator, self).__init__()
         
         self.nz = nz
         self.num_classes = num_classes
-
+        if emb_dimen is None:
+            emb_dimen = num_classes
+            
         # Label embedding
         self.label_emb = nn.Embedding(num_classes, emb_dimen)
 
