@@ -114,8 +114,8 @@ class Discriminator(nn.Module):
             nn.InstanceNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(64, 32, 4, stride=2, padding=1),  # Downsample to 2x2
-            nn.InstanceNorm2d(32),
+            nn.Conv2d(64, emb_dimen, 4, stride=2, padding=1),  # Downsample to 2x2
+            nn.InstanceNorm2d(emb_dimen),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
