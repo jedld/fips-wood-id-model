@@ -7,6 +7,7 @@ import os
 # Hyperparameters
 latent_dim = 100
 img_size = 512
+EMBED_DIM = 16
 channels = 3
 NUMBER_OF_IMAGES_PER_CLASS = 10
 num_classes = 31  # Update this based on your dataset
@@ -15,7 +16,7 @@ img_shape = (channels, img_size, img_size)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load generator model
-generator = Generator(nz=latent_dim, num_classes=num_classes).to(device)
+generator = Generator(nz=latent_dim, num_classes=num_classes, emb_dimen=EMBED_DIM).to(device)
 
 # Load the model with map_location
 model_path = 'best_generator_model.pth'
