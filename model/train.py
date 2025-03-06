@@ -5,7 +5,8 @@ from PIL import Image
 from torch.autograd import Variable
 import data
 import torch.nn as nn
-import model
+
+from mobilenet import MobileNetV2TransferClassifier
 from stn_model import MinimalCNN
 from Resnet18 import ResNet18
 import torchvision
@@ -20,6 +21,10 @@ from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
 from custom_transforms import ResizeWithPadding
 from torch.optim import lr_scheduler
+
+import torch.nn as nn
+import torchvision
+
 
 def main():
   batch_size = 32
@@ -69,7 +74,9 @@ def main():
   print('Total classes %s' % (total_classes ))
 
   # classifier = MinimalCNN(total_classes)
-  classifier = ImageResNetTransferClassifier(num_classes=total_classes)
+  #  classifier = ImageResNetTransferClassifier(num_classes=total_classes)
+
+  classifier = MobileNetV2TransferClassifier(num_classes=total_classes)
   # classifier = ResNet18(num_classes=total_classes)
 
 
@@ -78,7 +85,7 @@ def main():
 
   print(train_dataset.classes)
 
-  PATH = './checkpoint.pth'
+  PATH = "./checkpoint.pth"
 
   if Path(PATH).exists():
     print('loading weights')

@@ -18,6 +18,7 @@ class ImageResNetTransferClassifier(_BaseModel):
                  body_arch='resnet18',
                  body_num_blocks=8,
                  num_classes=2,
+                 pretrained=False,
                  head_params=default_head_params):
         super().__init__()
         # Exactly one of default_head/custom_head needs to be specified.
@@ -29,6 +30,7 @@ class ImageResNetTransferClassifier(_BaseModel):
         self.head_params = head_params
         self.body = None
         self.head = None
+        self.pretrained = pretrained
         self._make_model()
 
     def freeze_body(self, bn_freeze=False):
@@ -41,13 +43,15 @@ class ImageResNetTransferClassifier(_BaseModel):
         self.model = nn.Sequential(*body_head)
 
     def _make_body(self, arch, num_blocks):
-        resnets = {'resnet18': models.resnet18,
+
+        resnets = {
+                   'resnet18': models.resnet18,
                    'resnet34': models.resnet34,
                    'resnet50': models.resnet50,
                    'resnet101': models.resnet101,
                    'resnet152': models.resnet152,
                    'resnet18_quant' : models.quantization.resnet18}
-        lyrs = list(resnets[arch](pretrained=True).children())[:num_blocks]
+        lyrs = list(resnets[arch](pretrained=self.pretrained).children())[:num_blocks]
         self.body = nn.Sequential(*lyrs)
 
     def _make_head(self, num_classes, head_params):

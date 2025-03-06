@@ -8,3 +8,9 @@ pyparsing
 cycler
 kiwisolver
 tensorboard
+pandas
+scipy
+matplotlib
+torchsummary
+scikit-learn
+seaborn

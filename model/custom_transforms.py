@@ -16,7 +16,7 @@ class ResizeWithPadding:
         new_h = int(h * scale)
 
         # Resize the image with the calculated dimensions
-        img = img.resize((new_w, new_h), Image.ANTIALIAS)
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
         # Create a new image with the desired size and fill color
         new_img = Image.new("RGB", (self.size, self.size), (self.fill, self.fill, self.fill))

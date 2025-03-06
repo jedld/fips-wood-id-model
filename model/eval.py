@@ -5,7 +5,6 @@ from PIL import Image
 from torch.autograd import Variable
 import data
 import torch.nn as nn
-import model
 import torchvision
 from torchvision.datasets import ImageFolder
 import image_augmentations as ia
@@ -19,6 +18,9 @@ from sklearn.metrics import confusion_matrix, classification_report
 import seaborn as sns
 from optparse import OptionParser
 from stn_model import MinimalCNN
+from Resnet18 import ResNet18
+from mobilenet import MobileNetV2TransferClassifier
+
 from torchsummary import summary
 
 # Command-line options
@@ -56,7 +58,9 @@ test_dataset = ImageFolder(root=test_folder, transform=xfm_test2)
 testloader = torch.utils.data.DataLoader(test_dataset, batch_size=10, num_workers=0)
 
 # classifier = MinimalCNN(num_classes=len(test_dataset.classes))
-classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes))
+# classifier = ResNet18(num_classes=len(test_dataset.classes))
+# classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes))
+classifier = MobileNetV2TransferClassifier(num_classes=len(test_dataset.classes))
 
 
 print(test_dataset.classes)

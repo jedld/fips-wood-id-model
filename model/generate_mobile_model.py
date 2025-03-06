@@ -1,5 +1,6 @@
 import torch
 from image_resnet_transfer_classifier import ImageResNetTransferClassifier
+from mobilenet import MobileNetV2TransferClassifier
 from torchvision.transforms import transforms
 from torch.utils.mobile_optimizer import optimize_for_mobile
 from PIL import Image
@@ -15,25 +16,29 @@ from optparse import OptionParser
 
 # Command-line options
 parser = OptionParser()
-parser.add_option("-m", "--model", dest="model_file", default="wts.pth",
+parser.add_option("-m", "--model", dest="model_file", default="checkpoint.pth",
                   help="path to the model weights file", metavar="FILE")
 parser.add_option("-c", "--class_labels", dest="class_labels_file", default="class_labels.txt",
                   help="path to the class labels file", metavar="FILE")
-parser.add_option("-n", "--name", dest="model_name", default="resnet-18-31-class",
+parser.add_option("-n", "--name", dest="model_name", default="mobilenet-v2-02232025",
                   help="name of the model", metavar="NAME")
 parser.add_option("-d", "--description", dest="model_description", default="31 class resnet50 Wood Model V5",
                   help="description of the model", metavar="DESCRIPTION")
-parser.add_option("-t", "--type", dest="model_type", default="resnet18")
+parser.add_option("-t", "--type", dest="model_type", default="mobilenetv2")
 parser.add_option("-o", "--output", dest="output", default="model.zip")
 parser.add_option("-p","--path", dest="path", default=".")
 
 (options, args) = parser.parse_args()
 
 # define and load the model here
-def load_model(class_labels_file_path, model_file_path, arch='resnet18'):
+def load_model(class_labels_file_path, model_file_path, arch='mobilenetv2'):
     with open(class_labels_file_path, 'r') as fh:
       lines = [line.strip() for line in fh.readlines()]
-    cls = ImageResNetTransferClassifier(body_arch=arch, num_classes=len(lines))
+    if arch == 'resnet18':
+      cls = ImageResNetTransferClassifier(body_arch=arch, num_classes=len(lines))
+    else:
+      cls = MobileNetV2TransferClassifier(num_classes=len(lines))
+
     cls.load_weights(Path(model_file_path))
 
     return cls, lines
