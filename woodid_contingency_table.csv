@@ -1,0 +1,14 @@
+Species,iPhone SE Correct,iPhone SE Incorrect,iPhone 14 Pro Correct,iPhone 14 Pro Incorrect,Galaxy A52(baseline) Correct,Galaxy A52(baseline) Incorrect,Poco F3 Correct,Poco F3 Incorrect
+acacia auriculiformis,0,3,3,0,3,0,0,3
+acacia mangium,3,0,3,0,3,0,1,2
+eucalpytus camaldulensis,3,0,3,0,3,0,3,0
+falcataria falcata,3,0,3,0,3,0,0,3
+gmelina arborea,2,1,2,1,3,0,0,3
+leucaena leucocephala,3,0,3,0,3,0,3,0
+pterocarpus indicus,3,0,3,0,3,0,3,0
+samanea saman,2,1,3,0,3,0,0,3
+samanea saman (knife),2,1,3,0,2,1,0,3
+shorea contorta,2,1,3,0,3,0,0,3
+shorea negrosensis,0,3,0,3,3,0,1,2
+swietenia macrophylla,2,1,3,0,3,0,0,3
+tectona grandis,3,0,2,1,3,0,3,0

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Phone Model Performance Analysis</title>
+<style>
+    table, th, td {
+        border: 1px solid black;
+        border-collapse: collapse;
+        padding: 8px;
+        text-align: center;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    .highlight {
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+<h1>Phone Model Performance Analysis</h1>
+
+<h2>Contingency Table</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>iPhone SE</th>
+            <th>iPhone 14 Pro</th>
+            <th>Galaxy A52</th>
+            <th>Poco F3</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="highlight">Correct</td>
+            <td>28</td>
+            <td>34</td>
+            <td>38</td>
+            <td>14</td>
+        </tr>
+        <tr>
+            <td class="highlight">Incorrect</td>
+            <td>11</td>
+            <td>5</td>
+            <td>1</td>
+            <td>25</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Chi-Square Analysis</h2>
+<p>Chi-square statistic: <strong>43.1378</strong></p>
+<p>p-value: <strong>0.0000</strong></p>
+<p>Degrees of freedom: <strong>3</strong></p>
+<p><strong>Interpretation:</strong> The p-value is less than 0.05, indicating a significant association between phone model and performance.</p>
+
+<h2>Expected Frequencies</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>iPhone SE</th>
+            <th>iPhone 14 Pro</th>
+            <th>Galaxy A52</th>
+            <th>Poco F3</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="highlight">Correct</td>
+            <td>28.5</td>
+            <td>28.5</td>
+            <td>28.5</td>
+            <td>28.5</td>
+        </tr>
+        <tr>
+            <td class="highlight">Incorrect</td>
+            <td>10.5</td>
+            <td>10.5</td>
+            <td>10.5</td>
+            <td>10.5</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Accuracy by Phone Model</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Accuracy</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>iPhone SE</td>
+            <td>71.79%</td>
+        </tr>
+        <tr>
+            <td>iPhone 14 Pro</td>
+            <td>87.18%</td>
+        </tr>
+        <tr>
+            <td>Galaxy A52</td>
+            <td>97.44%</td>
+        </tr>
+        <tr>
+            <td>Poco F3</td>
+            <td>35.90%</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Species Performance by Phone Model</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Species</th>
+            <th>iPhone SE</th>
+            <th>iPhone 14 Pro</th>
+            <th>Galaxy A52</th>
+            <th>Poco F3</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Add rows for each species with their performance percentages -->
+        <!-- Example row: -->
+        <tr>
+            <td>Acacia auriculiformis</td>
+            <td>0.0%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>acacia mangium</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>33.0%</td>
+        </tr>
+        <tr>
+            <td>falcataria falcata</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>gmelina arborea</td>
+            <td>66.7%</td>
+            <td>66.7%</td>
+            <td>100.0%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>Samanea Saman</td>
+            <td>66.7%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>Samanea Saman (knife)</td>
+            <td>66.7%</td>
+            <td>100.0%</td>
+            <td>66.7%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>Shorea Contorta</td>
+            <td>66.7%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>Shorea Negrosensis</td>
+            <td>0.0%</td>
+            <td>0.0%</td>
+            <td>100.0%</td>
+            <td>33.0%</td>
+        </tr>
+        <tr>
+            <td>Swietenia Macrophylla</td>
+            <td>66.7%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+            <td>0.0%</td>
+        </tr>
+        <tr>
+            <td>Tectona Grandis</td>
+            <td>100.0%</td>
+            <td>66.7%</td>
+            <td>100.0%</td>
+            <td>100.0%</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Chi-square Tests for Phone Comparisons</h2>
+<!-- Add similar tables and results for each chi-square test between models -->
+<!-- Example chi-square result display -->
+<h3>Chi-square Test for iPhone SE vs Galaxy A52</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Correct</th>
+            <th>Incorrect</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>iPhone SE</td>
+            <td>28</td>
+            <td>11</td>
+        </tr>
+        <tr>
+            <td>Galaxy A52</td>
+            <td>38</td>
+            <td>1</td>
+        </tr>
+    </tbody>
+</table>
+<p>Chi-square statistic: <strong>7.9773</strong></p>
+<p>p-value: <strong>0.0047</strong></p>
+<p>Degrees of freedom: <strong>1</strong></p>
+<p><strong>Result:</strong> p (0.0047) < 0.05, so we reject the null hypothesis.</p>
+
+
+</body>
+</html>

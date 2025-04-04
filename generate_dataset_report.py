@@ -1,6 +1,22 @@
 import os
 import argparse
 
+def get_folder_size(folder_path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(folder_path):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            total_size += os.path.getsize(file_path)
+    return total_size
+
+def format_size(size_bytes):
+    """Convert bytes to human-readable format"""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} PB"
+
 def generate_report(dataset_folder):
     train_folder = os.path.join(dataset_folder, 'train')
     test_folder = os.path.join(dataset_folder, 'test')
@@ -10,16 +26,22 @@ def generate_report(dataset_folder):
 
     train_total = sum(train_counts.values())
     test_total = sum(test_counts.values())
+    
+    # Calculate total size of train and test datasets
+    train_size = get_folder_size(train_folder)
+    test_size = get_folder_size(test_folder)
 
     report_lines = ["Training Dataset:\n"]
     for class_name in sorted(train_counts.keys()):
         report_lines.append(f"Class '{class_name}': {train_counts[class_name]} images\n")
-    report_lines.append(f"Total images in training dataset: {train_total}\n\n")
+    report_lines.append(f"Total images in training dataset: {train_total}\n")
+    report_lines.append(f"Total size of training dataset: {format_size(train_size)}\n\n")
 
     report_lines.append("Test Dataset:\n")
     for class_name in sorted(test_counts.keys()):
         report_lines.append(f"Class '{class_name}': {test_counts[class_name]} images\n")
     report_lines.append(f"Total images in test dataset: {test_total}\n")
+    report_lines.append(f"Total size of test dataset: {format_size(test_size)}\n")
 
     report_path = os.path.join(dataset_folder, 'dataset_report.txt')
     with open(report_path, 'w') as report_file:

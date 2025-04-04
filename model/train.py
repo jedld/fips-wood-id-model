@@ -11,8 +11,8 @@ from stn_model import MinimalCNN
 from Resnet18 import ResNet18
 import torchvision
 from torchvision import datasets
-import image_augmentations as ia
-from torch.utils.data import Dataset, DataLoader
+
+
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,12 +21,15 @@ from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
 from custom_transforms import ResizeWithPadding
 from torch.optim import lr_scheduler
-
-import torch.nn as nn
-import torchvision
+import argparse
 
 
 def main():
+  # Add command line arguments
+  parser = argparse.ArgumentParser(description='Train a wood identification model')
+  parser.add_argument('--grayscale', action='store_true', help='Use grayscale images instead of color')
+  args = parser.parse_args()
+
   batch_size = 32
   divfac = 4
   best_epoch = 0
@@ -37,26 +40,41 @@ def main():
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   print(device)
+  print(f"Using {'grayscale' if args.grayscale else 'color'} images")
 
   # set random seed
   torch.manual_seed(1337)
 
   print("threads %d" % (torch.get_num_threads()))
 
-  xfm3 = transforms.Compose([
-                            ResizeWithPadding(512),
-                            transforms.RandomRotation(270),
-                            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-                            transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-                            transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3), value='random')
-                            ])
+  # Define base transformations
+  base_transforms = [
+    ResizeWithPadding(512),
+    transforms.RandomRotation(270),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3), value='random')
+  ]
 
-  xfm_test2 = transforms.Compose([
-                            transforms.Resize((512, 512)),
-                            transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+  # Add grayscale transformation if requested
+  if args.grayscale:
+    base_transforms.insert(0, transforms.Grayscale(num_output_channels=3))
 
+  xfm3 = transforms.Compose(base_transforms)
+
+  # Define test transformations
+  test_transforms = [
+    transforms.Resize((512, 512)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+  ]
+
+  # Add grayscale transformation for test if requested
+  if args.grayscale:
+    test_transforms.insert(0, transforms.Grayscale(num_output_channels=3))
+
+  xfm_test2 = transforms.Compose(test_transforms)
 
   train_dataset = datasets.ImageFolder(root='data/train', transform=xfm3)
 
@@ -170,15 +188,15 @@ def main():
     accuracy = success / (success + failure)
     print('Test [%d] loss: %.3f Success: %d Failure: %d Accuracy: %.3f Total: %d' %
                 (epoch + 1, test_loss / total_items, success, failure, accuracy, success + failure))
-    
+
     # Log test metrics to TensorBoard
     writer.add_scalar('Test/Loss', test_loss / total_items, epoch)
     writer.add_scalar('Test/Accuracy', accuracy, epoch)
-    
+
     # Log test images to TensorBoard
     out = torchvision.utils.make_grid(inputs)
     writer.add_image('Test Images', out, epoch)
-    
+
     return accuracy
 
   best_accuracy = test_model(0)
