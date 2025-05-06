@@ -29,6 +29,8 @@ parser.add_option("-t", "--test_folder", dest="test_folder", default="data/test"
                   help="path to the test folder", metavar="FOLDER")
 parser.add_option("-w", "--weights_file", dest="weights_file", default="checkpoint.pth",
                   help="path to the model weights file", metavar="FILE")
+parser.add_option("-g", "--grayscale", dest="grayscale", default=False,
+                  help="use grayscale images")
 
 (options, args) = parser.parse_args()
 
@@ -40,18 +42,36 @@ batch_size = 35
 divfac = 4
 resize_size = (2048//divfac, 2048//divfac)
 
-xfm_test = transforms.Compose([
-                          transforms.CenterCrop((2048,2048)),
-                          transforms.Resize(resize_size),
-                          transforms.ToTensor(),
-                          transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
+if options.grayscale:
+    xfm_test = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),
+        transforms.CenterCrop((2048,2048)),
+        transforms.Resize(resize_size),
+        transforms.ToTensor(),
+        normalize
+    ])
 
-xfm_test2 = transforms.Compose([
-                            transforms.Resize(resize_size),
-                            transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+    xfm_test2 = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),
+        transforms.Resize(resize_size),
+        transforms.ToTensor(),
+        normalize
+    ])
+else:
+    xfm_test = transforms.Compose([
+        transforms.CenterCrop((2048,2048)),
+        transforms.Resize(resize_size),
+        transforms.ToTensor(),
+        normalize
+    ])
 
+    xfm_test2 = transforms.Compose([
+        transforms.Resize(resize_size),
+        transforms.ToTensor(),
+        normalize
+    ])
 
 test_dataset = ImageFolder(root=test_folder, transform=xfm_test2)
 
@@ -168,8 +188,12 @@ def test_model(epoch):
   report = classification_report(all_labels, all_preds, target_names=test_dataset.classes)
   print("Classification Report:\n", report)
   # write report to file
-  with open("classification_report.txt", "w") as file:
-    file.write(report)
+  if options.grayscale:
+    with open("classification_report_grayscale.txt", "w") as file:
+      file.write(report)
+  else:
+    with open("classification_report.txt", "w") as file:
+      file.write(report)
   
   return accuracy
 

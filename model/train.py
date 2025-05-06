@@ -5,17 +5,19 @@ from PIL import Image
 from torch.autograd import Variable
 import data
 import torch.nn as nn
+import cv2
+import numpy as np
 
 from mobilenet import MobileNetV2TransferClassifier
 from stn_model import MinimalCNN
 from Resnet18 import ResNet18
 import torchvision
 from torchvision import datasets
+import tqdm
 
 
 import torch.optim as optim
 import matplotlib.pyplot as plt
-import numpy as np
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
@@ -23,11 +25,15 @@ from custom_transforms import ResizeWithPadding
 from torch.optim import lr_scheduler
 import argparse
 
+NORMALIZATION_STATS = [0.5184, 0.3767, 0.3015], [0.2343, 0.2134, 0.1974]
 
 def main():
   # Add command line arguments
   parser = argparse.ArgumentParser(description='Train a wood identification model')
-  parser.add_argument('--grayscale', action='store_true', help='Use grayscale images instead of color')
+  parser.add_argument('--grayscale', default=False, help='Use grayscale images instead of color')
+  parser.add_argument('--pretrained', default=True, help='Use pretrained model')
+  parser.add_argument('--model', default='mobilenet', help='Model to use')
+  parser.add_argument('--clahe', action='store_true', help='Use CLAHE preprocessing')
   args = parser.parse_args()
 
   batch_size = 32
@@ -53,9 +59,28 @@ def main():
     transforms.RandomRotation(270),
     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
     transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    transforms.Normalize(*NORMALIZATION_STATS),
     transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3), value='random')
   ]
+
+  # Add CLAHE transformation if requested
+  if args.clahe:
+    print("Using CLAHE preprocessing")
+    def clahe_transform(img):
+      img = np.array(img)
+      if len(img.shape) == 2:  # Grayscale
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        img = clahe.apply(img)
+      else:  # Color
+        lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        l = clahe.apply(l)
+        lab = cv2.merge((l,a,b))
+        img = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+      return Image.fromarray(img)
+    
+    base_transforms.insert(0, transforms.Lambda(clahe_transform))
 
   # Add grayscale transformation if requested
   if args.grayscale:
@@ -67,8 +92,12 @@ def main():
   test_transforms = [
     transforms.Resize((512, 512)),
     transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    transforms.Normalize(*NORMALIZATION_STATS)
   ]
+
+  # Add CLAHE transformation for test if requested
+  if args.clahe:
+    test_transforms.insert(0, transforms.Lambda(clahe_transform))
 
   # Add grayscale transformation for test if requested
   if args.grayscale:
@@ -91,11 +120,16 @@ def main():
   total_classes = len(train_dataset.classes)
   print('Total classes %s' % (total_classes ))
 
-  # classifier = MinimalCNN(total_classes)
-  #  classifier = ImageResNetTransferClassifier(num_classes=total_classes)
-
-  classifier = MobileNetV2TransferClassifier(num_classes=total_classes)
-  # classifier = ResNet18(num_classes=total_classes)
+  if args.model == 'minimalcnn':
+    classifier = MinimalCNN(total_classes)
+  elif args.model == 'mobilenet':
+    classifier = MobileNetV2TransferClassifier(num_classes=total_classes, pretrained=args.pretrained)
+  elif args.model == 'resnet18' and args.pretrained:
+    classifier = ImageResNetTransferClassifier(num_classes=total_classes)
+  elif args.model == 'resnet18':
+    classifier = ResNet18(num_classes=total_classes, pretrained=args.pretrained)
+  else:
+    raise ValueError(f"Unsupported model: {args.model}")
 
 
   if (train_dataset.classes != test_dataset.classes):
@@ -202,12 +236,12 @@ def main():
   best_accuracy = test_model(0)
 
   # Start model training
-  for epoch in range(MAX_EPOCHS):  # loop over the dataset multiple times
+  for epoch in tqdm.tqdm(range(MAX_EPOCHS)):  # loop over the dataset multiple times
       running_loss = 0.0
       classifier.train()
       success = 0
       failure = 0
-      for i, row_data in enumerate(trainloader, 0):
+      for i, row_data in tqdm.tqdm(enumerate(trainloader, 0)):
           # get the inputs; data is a list of [inputs, labels]
           inputs, labels = row_data[0].to(device), row_data[1].to(device)
 
@@ -236,10 +270,20 @@ def main():
         print("best accuracy %f" % (accuracy))
         best_accuracy = accuracy
         classifier.save_weights(PATH)
-        with open('model.txt', 'w') as the_file:
-          the_file.write('%.3f' % (accuracy))
+        if args.grayscale:
+          with open('model_grayscale.txt', 'w') as the_file:
+            the_file.write('%.3f@%d' % (accuracy, epoch))
+            the_file.write('\n')
+            the_file.write(str(NORMALIZATION_STATS))
+        else:
+          with open('model.txt', 'w') as the_file:
+            the_file.write('%.3f@%d' % (accuracy, epoch))
+            the_file.write('\n')
+            the_file.write(str(NORMALIZATION_STATS))
+
 
   print('Finished Training. Best accuracy %.3f' % (best_accuracy))
   writer.close()
 
-main()
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,3 @@
-
 import torchvision.models as models
 import torch.nn as nn
 import torch
@@ -6,7 +5,9 @@ import torch
 class MobileNetV2TransferClassifier(nn.Module):
     def __init__(self, num_classes, pretrained=True):
         super(MobileNetV2TransferClassifier, self).__init__()
-        base_model = models.mobilenet_v2(pretrained=pretrained)
+        # Use the recommended weights approach
+        weights = models.MobileNet_V2_Weights.DEFAULT if pretrained else None
+        base_model = models.mobilenet_v2(weights=weights)
         base_model.classifier[1] = nn.Linear(base_model.classifier[1].in_features, num_classes)
         self.model = base_model
     
