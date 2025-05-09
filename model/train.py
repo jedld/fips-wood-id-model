@@ -1,12 +1,15 @@
 import torch
 from image_resnet_transfer_classifier import ImageResNetTransferClassifier
 from torchvision.transforms import transforms
+from torchvision.transforms import functional as F
 from PIL import Image
 from torch.autograd import Variable
 import data
 import torch.nn as nn
 import cv2
 import numpy as np
+from collections import Counter
+from torch.utils.data.sampler import Sampler
 
 from mobilenet import MobileNetV2TransferClassifier
 from stn_model import MinimalCNN
@@ -24,29 +27,216 @@ from torchsummary import summary
 from custom_transforms import ResizeWithPadding
 from torch.optim import lr_scheduler
 import argparse
+import time
+from datetime import timedelta
+import datetime
 
-NORMALIZATION_STATS = [0.5184, 0.3767, 0.3015], [0.2343, 0.2134, 0.1974]
+# imagenet normalization
+NORMALIZATION_STATS = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+
+# custom normalization
+# NORMALIZATION_STATS = [0.5184, 0.3767, 0.3015], [0.2343, 0.2134, 0.1974]
+
+def plot_metrics(train_losses, test_losses, train_accs, test_accs, save_path='training_curves.png'):
+    """Plot training and test metrics over epochs."""
+    plt.figure(figsize=(12, 5))
+    
+    # Plot losses
+    plt.subplot(1, 2, 1)
+    plt.plot(train_losses, label='Training Loss')
+    plt.plot(test_losses, label='Test Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training and Test Loss')
+    plt.legend()
+    
+    # Plot accuracies
+    plt.subplot(1, 2, 2)
+    plt.plot(train_accs, label='Training Accuracy')
+    plt.plot(test_accs, label='Test Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training and Test Accuracy')
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
+class BalancedBatchSampler(Sampler):
+    """Samples batches with equal number of samples from each class."""
+    def __init__(self, dataset, batch_size):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.class_indices = {}
+        
+        # Group indices by class
+        for idx, (_, label) in enumerate(dataset.samples):
+            if label not in self.class_indices:
+                self.class_indices[label] = []
+            self.class_indices[label].append(idx)
+        
+        # Calculate samples per class per batch
+        self.samples_per_class = batch_size // len(self.class_indices)
+        if self.samples_per_class == 0:
+            self.samples_per_class = 1
+            print(f"Warning: Batch size {batch_size} is smaller than number of classes {len(self.class_indices)}. "
+                  f"Using 1 sample per class.")
+        
+        # Calculate total number of batches
+        self.num_batches = min(len(indices) // self.samples_per_class 
+                             for indices in self.class_indices.values())
+        
+        # Calculate class weights for sampling
+        class_counts = {label: len(indices) for label, indices in self.class_indices.items()}
+        total_samples = sum(class_counts.values())
+        self.class_weights = {label: total_samples / (len(class_counts) * count) 
+                            for label, count in class_counts.items()}
+        
+        print("Class distribution in dataset:")
+        for label, count in class_counts.items():
+            print(f"Class {dataset.classes[label]}: {count} samples")
+        print(f"Using {self.samples_per_class} samples per class per batch")
+
+    def __iter__(self):
+        # Create batches
+        for _ in range(self.num_batches):
+            batch_indices = []
+            for class_label in self.class_indices:
+                # Sample indices for this class
+                indices = np.random.choice(
+                    self.class_indices[class_label],
+                    size=self.samples_per_class,
+                    replace=len(self.class_indices[class_label]) < self.samples_per_class
+                )
+                batch_indices.extend(indices)
+            
+            # Shuffle the batch
+            np.random.shuffle(batch_indices)
+            yield batch_indices
+
+    def __len__(self):
+        return self.num_batches
+
+class EnhancedDataAugmentation:
+    """Enhanced data augmentation for underrepresented classes."""
+    def __init__(self, base_transforms, class_weights):
+        self.base_transforms = base_transforms
+        self.class_weights = class_weights
+        
+    def __call__(self, img, label):
+        # Apply base transforms
+        img = self.base_transforms(img)
+        
+        # For underrepresented classes, apply additional augmentations
+        if self.class_weights[label] > 1.5:  # If class is underrepresented
+            if np.random.random() < 0.5:
+                # Additional rotation
+                angle = np.random.uniform(-30, 30)
+                img = F.rotate(img, angle)
+            
+            if np.random.random() < 0.5:
+                # Additional color jitter
+                img = transforms.ColorJitter(
+                    brightness=0.2,
+                    contrast=0.2,
+                    saturation=0.2,
+                    hue=0.1
+                )(img)
+            
+            if np.random.random() < 0.5:
+                # Additional random erasing
+                img = transforms.RandomErasing(
+                    p=1.0,
+                    scale=(0.02, 0.1),
+                    ratio=(0.3, 3.3),
+                    value='random'
+                )(img)
+        
+        return img
+
+class OversamplingSampler(Sampler):
+    """Samples elements with oversampling for minority classes."""
+    def __init__(self, dataset, batch_size, oversample_factor=2.0):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.oversample_factor = oversample_factor
+        
+        # Get class distribution
+        self.class_indices = {}
+        for idx, (_, label) in enumerate(dataset.samples):
+            if label not in self.class_indices:
+                self.class_indices[label] = []
+            self.class_indices[label].append(idx)
+        
+        # Calculate class weights for oversampling
+        class_counts = {label: len(indices) for label, indices in self.class_indices.items()}
+        max_count = max(class_counts.values())
+        self.class_weights = {label: max_count / count for label, count in class_counts.items()}
+        
+        # Calculate total samples after oversampling
+        self.total_samples = int(sum(len(indices) * self.class_weights[label] 
+                                   for label, indices in self.class_indices.items()))
+        
+        print("Class distribution before oversampling:")
+        for label, count in class_counts.items():
+            print(f"Class {dataset.classes[label]}: {count} samples")
+        
+        print("\nOversampling factors:")
+        for label, weight in self.class_weights.items():
+            print(f"Class {dataset.classes[label]}: {weight:.2f}x")
+        
+        print(f"\nTotal samples after oversampling: {self.total_samples}")
+
+    def __iter__(self):
+        # Create indices with oversampling
+        indices = []
+        for label, label_indices in self.class_indices.items():
+            # Calculate how many times to repeat this class's indices
+            repeat_count = int(len(label_indices) * self.class_weights[label])
+            # Add repeated indices
+            indices.extend(np.random.choice(label_indices, size=repeat_count, replace=True))
+        
+        # Shuffle all indices
+        np.random.shuffle(indices)
+        
+        # Yield individual indices
+        for idx in indices:
+            yield idx
+
+    def __len__(self):
+        return self.total_samples
 
 def main():
+  # Start timing
+  start_time = time.time()
+
   # Add command line arguments
   parser = argparse.ArgumentParser(description='Train a wood identification model')
   parser.add_argument('--grayscale', default=False, help='Use grayscale images instead of color')
   parser.add_argument('--pretrained', default=True, help='Use pretrained model')
   parser.add_argument('--model', default='mobilenet', help='Model to use')
   parser.add_argument('--clahe', action='store_true', help='Use CLAHE preprocessing')
+  parser.add_argument('--plot', action='store_true', help='Plot training curves')
+  parser.add_argument('--size', type=int, default=512, help='Input size (512 or 1024)', metavar='SIZE')
+  parser.add_argument('--name', default=f"mobilenet-v2-{datetime.datetime.now().strftime('%Y%m%d')}", help='Name of the model')
+  parser.add_argument('--description', default="Wood Identification Model", help='Description of the model')
+  parser.add_argument('--balanced', action='store_true', help='Use oversampling to balance the dataset')
+  parser.add_argument('--oversample-factor', type=float, default=2.0, help='Factor to oversample minority classes')
   args = parser.parse_args()
 
   batch_size = 32
   divfac = 4
   best_epoch = 0
   MAX_EPOCHS = 100
-  NUM_WORKERS = 8
-  NUM_WORKERS_TEST = 2
+  NUM_WORKERS = 16
+  NUM_WORKERS_TEST = 4
 
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   print(device)
   print(f"Using {'grayscale' if args.grayscale else 'color'} images")
+  print(f"Input size: {args.size}x{args.size}")
 
   # set random seed
   torch.manual_seed(1337)
@@ -55,7 +245,8 @@ def main():
 
   # Define base transformations
   base_transforms = [
-    ResizeWithPadding(512),
+    transforms.CenterCrop((2048, 2048)),
+    ResizeWithPadding(args.size),
     transforms.RandomRotation(270),
     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
     transforms.ToTensor(),
@@ -90,7 +281,8 @@ def main():
 
   # Define test transformations
   test_transforms = [
-    transforms.Resize((512, 512)),
+    transforms.CenterCrop((2048, 2048)),
+    transforms.Resize((args.size, args.size)),
     transforms.ToTensor(),
     transforms.Normalize(*NORMALIZATION_STATS)
   ]
@@ -109,13 +301,33 @@ def main():
 
   test_dataset = datasets.ImageFolder(root='data/test', transform=xfm_test2)
 
-  fused_trainset = torch.utils.data.ConcatDataset([train_dataset])
-  fused_testset = torch.utils.data.ConcatDataset([test_dataset])
+  if args.balanced:
+    # Create oversampling sampler
+    oversample_sampler = OversamplingSampler(
+        train_dataset, 
+        batch_size,
+        oversample_factor=args.oversample_factor
+    )
+    
+    trainloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        sampler=oversample_sampler,
+        num_workers=NUM_WORKERS
+    )
+  else:
+    trainloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=NUM_WORKERS
+    )
 
-
-  trainloader = torch.utils.data.DataLoader(fused_trainset, batch_size=batch_size,
-                                            shuffle=True, num_workers=NUM_WORKERS)
-  testloader = torch.utils.data.DataLoader(fused_testset, batch_size=batch_size, num_workers=NUM_WORKERS_TEST)
+  testloader = torch.utils.data.DataLoader(
+      test_dataset,
+      batch_size=batch_size,
+      num_workers=NUM_WORKERS_TEST
+  )
 
   total_classes = len(train_dataset.classes)
   print('Total classes %s' % (total_classes ))
@@ -148,7 +360,7 @@ def main():
   images, labels = next(dataiter)
 
   # show images
-  print(' '.join('%5s' % train_dataset.classes[labels[j]] for j in range(batch_size)))
+  print(' '.join('%5s' % train_dataset.classes[labels[j].item()] for j in range(min(batch_size, len(labels)))))
 
   with open('class_labels.txt', 'w') as the_file:
       for c in train_dataset.classes:
@@ -187,8 +399,13 @@ def main():
   writer.add_image('Train Images', out)
 
   # Print model summary
-  summary(classifier, input_size=(3, 512, 512))
+  summary(classifier, input_size=(3, args.size, args.size))
 
+  # Initialize lists to store metrics
+  train_losses = []
+  test_losses = []
+  train_accs = []
+  test_accs = []
 
   def test_model(epoch):
     test_loss = 0.0
@@ -231,6 +448,10 @@ def main():
     out = torchvision.utils.make_grid(inputs)
     writer.add_image('Test Images', out, epoch)
 
+    # Store metrics for plotting
+    test_losses.append(test_loss / total_items)
+    test_accs.append(accuracy)
+
     return accuracy
 
   best_accuracy = test_model(0)
@@ -262,6 +483,24 @@ def main():
           # Log training metrics to TensorBoard
           writer.add_scalar('Train/Loss', running_loss / 10, epoch * len(trainloader) + i)
           running_loss = 0.0
+
+      # Calculate training accuracy
+      train_success = 0
+      train_total = 0
+      classifier.eval()
+      with torch.no_grad():
+          for inputs, labels in trainloader:
+              inputs, labels = inputs.to(device), labels.to(device)
+              outputs = classifier(inputs)
+              _, predicted = torch.max(outputs.data, 1)
+              train_total += labels.size(0)
+              train_success += (predicted == labels).sum().item()
+      train_accuracy = train_success / train_total
+      
+      # Store training metrics
+      train_losses.append(running_loss / len(trainloader))
+      train_accs.append(train_accuracy)
+
       # scheduler.step()
       accuracy = test_model(epoch)
       if (accuracy > best_accuracy):
@@ -272,17 +511,42 @@ def main():
         classifier.save_weights(PATH)
         if args.grayscale:
           with open('model_grayscale.txt', 'w') as the_file:
-            the_file.write('%.3f@%d' % (accuracy, epoch))
-            the_file.write('\n')
-            the_file.write(str(NORMALIZATION_STATS))
+            current_date = datetime.datetime.now()
+            the_file.write(f"Version: {current_date.strftime('%Y%m%d%H%M%S')}\n")
+            the_file.write(f"Model Name: {args.name}\n")
+            the_file.write(f"Model Type: {args.model}\n")
+            the_file.write(f"Input Size: {args.size}x{args.size}\n")
+            the_file.write(f"Model Description: {args.description}\n")
+            the_file.write(f"PyTorch Version: {torch.__version__}\n")
+            the_file.write(f"Generated Date: {current_date.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            the_file.write(f"Best Accuracy: {accuracy:.3f}@Epoch {epoch}\n")
+            the_file.write(f"Normalization Stats: {NORMALIZATION_STATS}\n")
+            the_file.write(f"Grayscale: True\n")
         else:
           with open('model.txt', 'w') as the_file:
-            the_file.write('%.3f@%d' % (accuracy, epoch))
-            the_file.write('\n')
-            the_file.write(str(NORMALIZATION_STATS))
+            current_date = datetime.datetime.now()
+            the_file.write(f"Version: {current_date.strftime('%Y%m%d%H%M%S')}\n")
+            the_file.write(f"Model Name: {args.name}\n")
+            the_file.write(f"Model Type: {args.model}\n")
+            the_file.write(f"Input Size: {args.size}x{args.size}\n")
+            the_file.write(f"Model Description: {args.description}\n")
+            the_file.write(f"PyTorch Version: {torch.__version__}\n")
+            the_file.write(f"Generated Date: {current_date.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            the_file.write(f"Best Accuracy: {accuracy:.3f}@Epoch {epoch}\n")
+            the_file.write(f"Normalization Stats: {NORMALIZATION_STATS}\n")
+            the_file.write(f"Grayscale: False\n")
 
+      # Plot curves if requested
+      if args.plot:
+          plot_metrics(train_losses, test_losses, train_accs, test_accs)
 
   print('Finished Training. Best accuracy %.3f' % (best_accuracy))
+  
+  # Calculate and print total training time
+  end_time = time.time()
+  total_time = end_time - start_time
+  print(f'Total training time: {timedelta(seconds=int(total_time))}')
+  
   writer.close()
 
 if __name__ == "__main__":

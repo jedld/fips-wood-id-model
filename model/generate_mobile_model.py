@@ -20,13 +20,14 @@ parser.add_option("-m", "--model", dest="model_file", default="checkpoint.pth",
                   help="path to the model weights file", metavar="FILE")
 parser.add_option("-c", "--class_labels", dest="class_labels_file", default="class_labels.txt",
                   help="path to the class labels file", metavar="FILE")
-parser.add_option("-n", "--name", dest="model_name", default="mobilenet-v2-02232025",
+parser.add_option("-n", "--name", dest="model_name", default=f"mobilenet-v2-{datetime.datetime.now().strftime('%Y%m%d')}",
                   help="name of the model", metavar="NAME")
 parser.add_option("-d", "--description", dest="model_description", default="31 class resnet50 Wood Model V5",
                   help="description of the model", metavar="DESCRIPTION")
 parser.add_option("-t", "--type", dest="model_type", default="mobilenetv2")
 parser.add_option("-o", "--output", dest="output", default="model.zip")
 parser.add_option("-p","--path", dest="path", default=".")
+parser.add_option("-s","--size", dest="input_size", default=512, type="int", help="input size (512 or 1024)", metavar="SIZE")
 
 (options, args) = parser.parse_args()
 
@@ -55,8 +56,8 @@ classifier.eval()
 
 
 divfac = 4
-resize_size = (2048//divfac, 2048//divfac)
-xfm = transforms.Compose([ia.PadToEnsureSize(out_size=(2048, 2048)),
+resize_size = (options.input_size//divfac, options.input_size//divfac)
+xfm = transforms.Compose([ia.PadToEnsureSize(out_size=(options.input_size, options.input_size)),
                           ia.Resize(out_size=resize_size),
                           ia.ToTensor(),
                           ia.ImageNetNormalize()])
@@ -101,7 +102,13 @@ if not os.path.exists(model_txt_file):
   print("Generating model.txt place version string here and rerun this script.")
   with open(model_txt_file, 'w') as txt_file:
     current_date = datetime.datetime.now()
-    txt_file.write(f"{current_date.strftime('%Y%m%d%H%M%S')}")
+    txt_file.write(f"Version: {current_date.strftime('%Y%m%d%H%M%S')}\n")
+    txt_file.write(f"Model Name: {options.model_name}\n")
+    txt_file.write(f"Model Type: {options.model_type}\n")
+    txt_file.write(f"Input Size: {options.input_size}x{options.input_size}\n")
+    txt_file.write(f"Model Description: {options.model_description}\n")
+    txt_file.write(f"PyTorch Version: {torch.__version__}\n")
+    txt_file.write(f"Generated Date: {current_date.strftime('%Y-%m-%d %H:%M:%S')}\n")
 
 database_content = {}
 with open('species_database.csv') as csv_file:
