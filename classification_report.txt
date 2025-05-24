@@ -1,37 +1,37 @@
                             precision    recall  f1-score   support
 
-     acacia_auriculiformis       0.00      0.00      0.00         9
-            acacia_mangium       0.00      0.00      0.00         9
-            acer_saccharum       0.00      0.00      0.00         9
-dipterocarpus_grandiflorus       0.00      0.00      0.00         9
-      endospermum_peltatum       0.00      0.00      0.00         9
-  eucalyptus_camaldulensis       0.11      0.11      0.11         9
-        falcataria_falcata       0.00      0.00      0.00         9
-        fraxinus_americana       0.00      0.00      0.00        12
-           gmelina_arborea       0.00      0.00      0.00         9
-        hevea_brasiliensis       0.00      0.00      0.00         9
-             instia_bijuga       0.00      0.00      0.00         9
-             juglans_nigra       0.00      0.00      0.00         9
-             juglans_regia       0.00      0.00      0.00         9
-     leucaena_leucocephala       0.00      0.00      0.00         9
-                 palosapis       0.00      0.00      0.00         9
-     parashorea_malaanonan       0.00      0.00      0.00         9
-           pometia_pinnata       0.00      0.00      0.00         9
-       pterocarpus_indicus       0.00      0.00      0.00         9
-             quercus_robur       0.00      0.00      0.00         9
-             samanea_saman       0.02      0.12      0.03         8
-             shorea_albida       0.00      0.00      0.00         9
-           shorea_astylosa       0.00      0.00      0.00         9
-           shorea_contorta       0.00      0.00      0.00         9
-        shorea_negrosensis       0.00      0.00      0.00         9
-              shorea_ovata       0.00      0.00      0.00         9
-          shorea_palosapis       0.00      0.00      0.00         2
-         shorea_parvifolia       0.00      0.00      0.00         9
-         shorea_polysperma       0.02      0.22      0.04         9
-     swietenia_macrophylla       0.00      0.00      0.00        11
-           tectona_grandis       0.00      0.00      0.00         9
-          vitex_parviflora       0.16      0.78      0.26         9
+     acacia_auriculiformis       0.90      1.00      0.95         9
+            acacia_mangium       0.90      1.00      0.95         9
+            acer_saccharum       1.00      1.00      1.00         9
+dipterocarpus_grandiflorus       1.00      1.00      1.00         9
+      endospermum_peltatum       1.00      0.67      0.80         9
+  eucalyptus_camaldulensis       0.90      1.00      0.95         9
+        falcataria_falcata       0.57      0.44      0.50         9
+        fraxinus_americana       1.00      0.75      0.86        12
+           gmelina_arborea       0.69      1.00      0.82         9
+        hevea_brasiliensis       1.00      1.00      1.00         9
+             instia_bijuga       1.00      1.00      1.00         9
+             juglans_nigra       0.90      1.00      0.95         9
+             juglans_regia       0.90      1.00      0.95         9
+     leucaena_leucocephala       0.89      0.89      0.89         9
+                 palosapis       1.00      0.89      0.94         9
+     parashorea_malaanonan       1.00      1.00      1.00         9
+           pometia_pinnata       1.00      1.00      1.00         9
+       pterocarpus_indicus       0.82      1.00      0.90         9
+             quercus_robur       1.00      1.00      1.00         9
+             samanea_saman       0.88      0.88      0.88         8
+             shorea_albida       1.00      1.00      1.00         9
+           shorea_astylosa       1.00      0.78      0.88         9
+           shorea_contorta       1.00      1.00      1.00         9
+        shorea_negrosensis       0.56      1.00      0.72         9
+              shorea_ovata       1.00      0.78      0.88         9
+          shorea_palosapis       1.00      1.00      1.00         2
+         shorea_parvifolia       1.00      1.00      1.00         9
+         shorea_polysperma       0.75      0.33      0.46         9
+     swietenia_macrophylla       0.92      1.00      0.96        11
+           tectona_grandis       0.90      1.00      0.95         9
+          vitex_parviflora       0.86      0.67      0.75         9
 
-                  accuracy                           0.04       276
-                 macro avg       0.01      0.04      0.01       276
-              weighted avg       0.01      0.04      0.01       276
+                  accuracy                           0.90       276
+                 macro avg       0.91      0.91      0.90       276
+              weighted avg       0.91      0.90      0.90       276

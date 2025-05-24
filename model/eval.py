@@ -77,14 +77,13 @@ weights_file = options.weights_file
 settings = parse_model_txt(options.model_txt)
 
 # Use settings from model.txt if available, otherwise use defaults
-input_size = settings.get('input_size', 2048)
 is_grayscale = settings.get('grayscale', options.grayscale)
 normalization_stats = settings.get('normalization_stats', NORMALIZATION_STATS)
 model_type = settings.get('model_type', 'mobilenet')
 
 batch_size = 35
 divfac = 4
-resize_size = (input_size//divfac, input_size//divfac)
+resize_size = (2048//divfac, 2048//divfac)
 
 # use normalization from model.txt or default to imagenet normalization
 normalize = transforms.Normalize(mean=normalization_stats[0], std=normalization_stats[1])
@@ -92,7 +91,7 @@ normalize = transforms.Normalize(mean=normalization_stats[0], std=normalization_
 if is_grayscale:
     xfm_test = transforms.Compose([
         transforms.Grayscale(num_output_channels=3),
-        transforms.CenterCrop((input_size, input_size)),
+        transforms.CenterCrop((2048, 2048)),
         transforms.Resize(resize_size),
         transforms.ToTensor(),
         normalize
@@ -106,7 +105,7 @@ if is_grayscale:
     ])
 else:
     xfm_test = transforms.Compose([
-        transforms.CenterCrop((input_size, input_size)),
+        transforms.CenterCrop((2048, 2048)),
         transforms.Resize(resize_size),
         transforms.ToTensor(),
         normalize
@@ -118,7 +117,7 @@ else:
         normalize
     ])
 
-test_dataset = ImageFolder(root=test_folder, transform=xfm_test2)
+test_dataset = ImageFolder(root=test_folder, transform=xfm_test)
 
 testloader = torch.utils.data.DataLoader(test_dataset, batch_size=10, num_workers=0)
 
@@ -134,13 +133,13 @@ else:
     classifier = MobileNetV2TransferClassifier(num_classes=len(test_dataset.classes))
 
 print(f"Using model type: {model_type}")
-print(f"Input size: {input_size}x{input_size}")
+print(f"Input size: 512x512")
 print(f"Grayscale: {is_grayscale}")
 print(f"Normalization stats: {normalization_stats}")
 
 print(test_dataset.classes)
 
-if Path(weights_file).exists():
+if Path(weights_file).exists(): 
   if weights_file.endswith('.pt'):
     device = torch.device("cpu")
     classifier = torch.jit.load(weights_file)
@@ -167,17 +166,22 @@ classifier = classifier.to(device)
 
 criterion = nn.CrossEntropyLoss()
 
-def imshow(inp, title=None):
+def imshow(inp, ax=None, title=None):
     """Imshow for Tensor."""
     inp = inp.numpy().transpose((1, 2, 0))
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
     inp = std * inp + mean
     inp = np.clip(inp, 0, 1)
-    plt.imshow(inp)
-    if title is not None:
-        plt.title(title)
-    plt.pause(0.001)  # pause a bit so that plots are updated
+    if ax is None:
+        plt.imshow(inp)
+        if title is not None:
+            plt.title(title)
+        plt.pause(0.001)
+    else:
+        ax.imshow(inp)
+        if title is not None:
+            ax.set_title(title)
 
 # Get a batch of training data
 inputs, classes = next(iter(testloader))
@@ -270,6 +274,97 @@ def suggest_class_merges(confusion_ratios, min_ratio=0.3, min_samples=10):
     
     return suggestions
 
+def plot_confused_images(inputs, true_labels, pred_labels, class_names, test_dataset, threshold=0.3):
+    """
+    Plot pairs of images that were confused with each other and save them to a directory.
+    Args:
+        inputs: Batch of input images
+        true_labels: True labels for the images
+        pred_labels: Predicted labels for the images
+        class_names: List of class names
+        test_dataset: The test dataset to get sample images from
+        threshold: Minimum confidence threshold to consider an image as confused
+    """
+    # Create output directory for confusion plots
+    output_dir = Path("confusion_analysis")
+    output_dir.mkdir(exist_ok=True)
+    
+    # Create a dictionary to store confused image pairs
+    confused_pairs = defaultdict(list)
+    
+    # Get sample images for each class
+    class_samples = defaultdict(list)
+    for idx, (img, label) in enumerate(test_dataset):
+        class_samples[label].append((img, test_dataset.samples[idx][0]))
+        if len(class_samples[label]) >= 3:  # Store 3 samples per class
+            break
+    
+    for i, (true_label, pred_label) in enumerate(zip(true_labels, pred_labels)):
+        if true_label != pred_label:
+            pair_key = tuple(sorted([true_label, pred_label]))
+            confused_pairs[pair_key].append((inputs[i], true_label, pred_label))
+    
+    # Plot confused pairs
+    for (class1, class2), pairs in confused_pairs.items():
+        if len(pairs) > 0:
+            print(f"\nConfused pairs between {class_names[class1]} and {class_names[class2]}:")
+            n_pairs = min(len(pairs), 5)  # Show at most 5 pairs per confusion
+            
+            # Create figure with proper size and DPI
+            fig, axes = plt.subplots(n_pairs, 4, figsize=(20, 3*n_pairs), dpi=100)
+            fig.suptitle(f'Confusion between {class_names[class1]} and {class_names[class2]}', fontsize=16)
+            
+            for i, (img, true_label, pred_label) in enumerate(pairs[:n_pairs]):
+                if n_pairs == 1:
+                    ax1, ax2, ax3, ax4 = axes
+                else:
+                    ax1, ax2, ax3, ax4 = axes[i]
+                
+                # Plot confused image
+                img_np = img.cpu().numpy().transpose((1, 2, 0))
+                mean = np.array([0.485, 0.456, 0.406])
+                std = np.array([0.229, 0.224, 0.225])
+                img_np = std * img_np + mean
+                img_np = np.clip(img_np, 0, 1)
+                ax1.imshow(img_np)
+                ax1.set_title(f'Confused Image\nTrue: {class_names[true_label]}', fontsize=10)
+                ax1.axis('off')
+                
+                # Plot sample of true class
+                if class_samples[true_label]:
+                    sample_img, sample_path = class_samples[true_label][0]
+                    sample_np = sample_img.numpy().transpose((1, 2, 0))
+                    sample_np = std * sample_np + mean
+                    sample_np = np.clip(sample_np, 0, 1)
+                    ax2.imshow(sample_np)
+                    ax2.set_title(f'Sample {class_names[true_label]}\n{Path(sample_path).name}', fontsize=10)
+                    ax2.axis('off')
+                
+                # Plot sample of predicted class
+                if class_samples[pred_label]:
+                    sample_img, sample_path = class_samples[pred_label][0]
+                    sample_np = sample_img.numpy().transpose((1, 2, 0))
+                    sample_np = std * sample_np + mean
+                    sample_np = np.clip(sample_np, 0, 1)
+                    ax3.imshow(sample_np)
+                    ax3.set_title(f'Sample {class_names[pred_label]}\n{Path(sample_path).name}', fontsize=10)
+                    ax3.axis('off')
+                
+                # Add filename of confused image
+                ax4.axis('off')
+                ax4.text(0.1, 0.5, f'Filename:\n{test_dataset.samples[i][0]}', 
+                        fontsize=8, wrap=True)
+            
+            plt.tight_layout()
+            
+            # Save the plot
+            safe_class1 = class_names[class1].replace('/', '_')
+            safe_class2 = class_names[class2].replace('/', '_')
+            output_file = output_dir / f'confusion_{safe_class1}_vs_{safe_class2}.png'
+            plt.savefig(output_file, bbox_inches='tight', dpi=150)
+            plt.close()
+            print(f"Saved confusion plot to {output_file}")
+
 def test_model(epoch):
     test_loss = 0.0
     total_items = 0
@@ -278,6 +373,10 @@ def test_model(epoch):
     classifier.eval()
     all_labels = []
     all_preds = []
+    all_inputs = []
+    all_true_labels = []
+    all_pred_labels = []
+    
     for _, data in enumerate(testloader):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data[0].to(device), data[1].to(device)
@@ -300,11 +399,24 @@ def test_model(epoch):
                 actual = test_dataset.classes[index]
                 all_labels.append(expected)
                 all_preds.append(actual)
+                all_inputs.append(inputs[i2])
+                all_true_labels.append(label_indexes[i2])
+                all_pred_labels.append(index)
+                
                 if expected == actual:
                     success += 1
                 else:
                     print("%s -> %s" % (expected, actual))
                     failure += 1
+
+    # Plot confused images
+    plot_confused_images(
+        torch.stack(all_inputs),
+        torch.tensor(all_true_labels),
+        torch.tensor(all_pred_labels),
+        test_dataset.classes,
+        test_dataset
+    )
 
     accuracy = success / (success + failure)
     print('Test [%d] loss: %.3f Success: %d Failure: %d Accuracy: %.3f Total: %d' %

@@ -112,6 +112,63 @@ Preqrequisites:
 4. Select the zip file that was transferred to your iOS Device.
 5. Wait for the zip file to be processed by the app and loaded onto the device. Once done, the PhilWoodID app will show a message indicating that the model has been updated successfully. The selected model will be active on the device.
 
+## Training Optimizations
+
+The training script includes several optimizations to speed up training. Here are the available options and tips for optimal performance:
+
+### Command Line Options
+
+```bash
+python model/train.py --balanced --amp --pin-memory --batch-size 64
+```
+
+- `--balanced`: Enable oversampling to balance the dataset
+- `--amp`: Enable automatic mixed precision training (FP16)
+- `--pin-memory`: Use pinned memory for faster CPU-GPU data transfer
+- `--batch-size`: Set the batch size (default: 32)
+- `--size`: Input image size (default: 512)
+- `--model`: Model architecture to use (default: mobilenet)
+
+### Performance Tips
+
+1. **Data Loading Optimizations**
+   - Use a fast storage system (NVMe SSD recommended)
+   - Consider storing the dataset on a RAM disk for maximum speed
+   - Use smaller image sizes if accuracy requirements allow
+   - The number of workers is automatically set based on your CPU cores
+
+2. **GPU Optimizations**
+   - Automatic Mixed Precision (AMP) can provide up to 2x speedup on modern GPUs
+   - Larger batch sizes can improve GPU utilization (if you have enough GPU memory)
+   - cuDNN benchmarking is enabled by default for optimal performance
+   - Pinned memory reduces data transfer overhead
+
+3. **Model Architecture**
+   - MobileNetV2 is used by default for a good speed/accuracy tradeoff
+   - Consider using MobileNetV3 or EfficientNet-Lite for even better performance
+   - The model can be changed using the `--model` argument
+
+4. **System Configuration**
+   - Set CPU governor to performance mode
+   - Ensure proper cooling for sustained performance
+   - Close other GPU-intensive applications
+   - Use a GPU with sufficient memory for your batch size
+
+### Monitoring Training
+
+The training script includes TensorBoard integration for monitoring:
+```bash
+tensorboard --logdir=runs
+```
+
+### Best Practices
+
+1. Start with a smaller batch size and increase it if your GPU memory allows
+2. Enable AMP and pinned memory for maximum performance
+3. Use the balanced sampling option if your dataset is imbalanced
+4. Monitor GPU utilization and memory usage to find optimal settings
+5. Consider using a validation set to prevent overfitting
+
 
 
 

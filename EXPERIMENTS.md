@@ -339,3 +339,133 @@ dipterocarpus_grandiflorus       1.00      1.00      1.00         9
                   accuracy                           0.96       271
                  macro avg       0.97      0.96      0.96       271
               weighted avg       0.97      0.96      0.96       271
+
+
+Experiments Take 2:
+
+Resnet18 no augmentation:
+
+100 [3:29:12<00:00, 125.53s/it]
+Finished Training. Best accuracy 0.764
+Total training time: 3:29:46
+
+                             precision    recall  f1-score   support
+
+     acacia_auriculiformis       1.00      0.89      0.94         9
+            acacia_mangium       0.50      0.44      0.47         9
+            acer_saccharum       1.00      1.00      1.00         9
+dipterocarpus_grandiflorus       0.90      1.00      0.95         9
+      endospermum_peltatum       0.82      1.00      0.90         9
+  eucalyptus_camaldulensis       0.67      0.67      0.67         9
+        falcataria_falcata       1.00      0.33      0.50         9
+        fraxinus_americana       1.00      0.42      0.59        12
+           gmelina_arborea       0.38      0.89      0.53         9
+        hevea_brasiliensis       1.00      0.56      0.71         9
+             instia_bijuga       1.00      1.00      1.00         9
+             juglans_nigra       0.30      1.00      0.46         9
+             juglans_regia       1.00      1.00      1.00         9
+     leucaena_leucocephala       0.83      0.56      0.67         9
+                 palosapis       1.00      0.78      0.88         9
+     parashorea_malaanonan       1.00      1.00      1.00         9
+           pometia_pinnata       1.00      0.33      0.50         9
+       pterocarpus_indicus       1.00      0.56      0.71         9
+             quercus_robur       1.00      0.33      0.50         9
+             samanea_saman       0.25      0.38      0.30         8
+             shorea_albida       1.00      1.00      1.00         9
+           shorea_astylosa       1.00      0.33      0.50         9
+           shorea_contorta       0.69      1.00      0.82         9
+        shorea_negrosensis       0.82      1.00      0.90         9
+              shorea_ovata       0.50      0.33      0.40         9
+          shorea_palosapis       0.00      0.00      0.00         2
+         shorea_parvifolia       1.00      1.00      1.00         9
+         shorea_polysperma       0.69      1.00      0.82         9
+     swietenia_macrophylla       1.00      0.45      0.62        11
+           tectona_grandis       0.45      1.00      0.62         9
+          vitex_parviflora       0.60      0.33      0.43         9
+
+                  accuracy                           0.71       276
+                 macro avg       0.79      0.70      0.69       276
+              weighted avg       0.81      0.71      0.71       276
+
+Resnet18 with Augmentation
+
+Classification Report:
+                             precision    recall  f1-score   support
+
+     acacia_auriculiformis       1.00      1.00      1.00         9
+            acacia_mangium       1.00      0.89      0.94         9
+            acer_saccharum       1.00      1.00      1.00         9
+dipterocarpus_grandiflorus       0.82      1.00      0.90         9
+      endospermum_peltatum       1.00      0.11      0.20         9
+  eucalyptus_camaldulensis       0.56      1.00      0.72         9
+        falcataria_falcata       1.00      0.33      0.50         9
+        fraxinus_americana       1.00      0.75      0.86        12
+           gmelina_arborea       0.33      1.00      0.50         9
+        hevea_brasiliensis       0.86      0.67      0.75         9
+             instia_bijuga       0.86      0.67      0.75         9
+             juglans_nigra       0.56      1.00      0.72         9
+             juglans_regia       1.00      1.00      1.00         9
+     leucaena_leucocephala       0.69      1.00      0.82         9
+                 palosapis       1.00      0.33      0.50         9
+     parashorea_malaanonan       0.82      1.00      0.90         9
+           pometia_pinnata       1.00      0.11      0.20         9
+       pterocarpus_indicus       0.71      0.56      0.62         9
+             quercus_robur       1.00      0.89      0.94         9
+             samanea_saman       1.00      0.38      0.55         8
+             shorea_albida       1.00      0.89      0.94         9
+           shorea_astylosa       1.00      0.67      0.80         9
+           shorea_contorta       0.57      0.44      0.50         9
+        shorea_negrosensis       1.00      1.00      1.00         9
+              shorea_ovata       0.55      0.67      0.60         9
+          shorea_palosapis       0.00      0.00      0.00         2
+         shorea_parvifolia       1.00      1.00      1.00         9
+         shorea_polysperma       0.60      1.00      0.75         9
+     swietenia_macrophylla       0.50      0.82      0.62        11
+           tectona_grandis       1.00      1.00      1.00         9
+          vitex_parviflora       0.83      0.56      0.67         9
+
+                  accuracy                           0.75       276
+                 macro avg       0.82      0.73      0.72       276
+              weighted avg       0.83      0.75      0.74       276
+
+MobileNetV2 with augmentation:
+
+Classification Report:
+                             precision    recall  f1-score   support
+
+     acacia_auriculiformis       0.90      1.00      0.95         9
+            acacia_mangium       0.90      1.00      0.95         9
+            acer_saccharum       1.00      1.00      1.00         9
+dipterocarpus_grandiflorus       1.00      1.00      1.00         9
+      endospermum_peltatum       1.00      0.67      0.80         9
+  eucalyptus_camaldulensis       0.90      1.00      0.95         9
+        falcataria_falcata       0.57      0.44      0.50         9
+        fraxinus_americana       1.00      0.75      0.86        12
+           gmelina_arborea       0.69      1.00      0.82         9
+        hevea_brasiliensis       1.00      1.00      1.00         9
+             instia_bijuga       1.00      1.00      1.00         9
+             juglans_nigra       0.90      1.00      0.95         9
+             juglans_regia       0.90      1.00      0.95         9
+     leucaena_leucocephala       0.89      0.89      0.89         9
+                 palosapis       1.00      0.89      0.94         9
+     parashorea_malaanonan       1.00      1.00      1.00         9
+           pometia_pinnata       1.00      1.00      1.00         9
+       pterocarpus_indicus       0.82      1.00      0.90         9
+             quercus_robur       1.00      1.00      1.00         9
+             samanea_saman       0.88      0.88      0.88         8
+             shorea_albida       1.00      1.00      1.00         9
+           shorea_astylosa       1.00      0.78      0.88         9
+           shorea_contorta       1.00      1.00      1.00         9
+        shorea_negrosensis       0.56      1.00      0.72         9
+              shorea_ovata       1.00      0.78      0.88         9
+          shorea_palosapis       1.00      1.00      1.00         2
+         shorea_parvifolia       1.00      1.00      1.00         9
+         shorea_polysperma       0.75      0.33      0.46         9
+     swietenia_macrophylla       0.92      1.00      0.96        11
+           tectona_grandis       0.90      1.00      0.95         9
+          vitex_parviflora       0.86      0.67      0.75         9
+
+                  accuracy                           0.90       276
+                 macro avg       0.91      0.91      0.90       276
+              weighted avg       0.91      0.90      0.90       276
+
