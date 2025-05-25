@@ -17,3 +17,4 @@ data/
 # tensorboard
 runs/
 generated_images/
+human_eval/

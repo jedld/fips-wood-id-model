@@ -32,6 +32,11 @@ import argparse
 import time
 from datetime import timedelta
 import datetime
+from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim import AdamW
+from torch.optim.swa_utils import AveragedModel, SWALR
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 # imagenet normalization
 NORMALIZATION_STATS = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
@@ -209,6 +214,103 @@ class OversamplingSampler(Sampler):
     def __len__(self):
         return self.total_samples
 
+def get_transforms(args):
+    if args.augmentation:
+        # Training transforms with albumentations
+        train_transform = A.Compose([
+            A.RandomRotate90(p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.Affine(
+                rotate=(-45, 45),
+                translate_percent=(-0.0625, 0.0625),
+                scale=(0.9, 1.1),
+                p=0.5
+            ),
+            A.OneOf([
+                A.ElasticTransform(
+                    alpha=120,
+                    sigma=120 * 0.05,
+                    p=0.5
+                ),
+                A.GridDistortion(p=0.5),
+                A.OpticalDistortion(
+                    distort_limit=1,
+                    p=0.5
+                ),
+            ], p=0.3),
+            A.OneOf([
+                A.GaussNoise(p=0.5),
+                A.RandomBrightnessContrast(p=0.5),
+                A.RandomGamma(p=0.5),
+            ], p=0.3),
+            A.OneOf([
+                A.CLAHE(clip_limit=2, p=0.5),
+                A.Sharpen(p=0.5),
+                A.Emboss(p=0.5),
+                A.RandomBrightnessContrast(p=0.5),
+            ], p=0.3),
+            A.OneOf([
+                A.RandomResizedCrop(
+                    size=(args.size, args.size),
+                    scale=(0.8, 1.0),
+                    p=0.5
+                ),
+                A.RandomSizedCrop(
+                    min_max_height=(int(args.size*0.8), args.size),
+                    size=(args.size, args.size),
+                    p=0.5
+                ),
+            ], p=0.3),
+            A.Resize(args.size, args.size),
+            A.Normalize(mean=NORMALIZATION_STATS[0], std=NORMALIZATION_STATS[1]),
+            ToTensorV2(),
+        ])
+    else:
+        train_transform = A.Compose([
+            A.Resize(args.size, args.size),
+            A.Normalize(mean=NORMALIZATION_STATS[0], std=NORMALIZATION_STATS[1]),
+            ToTensorV2(),
+        ])
+
+    # Test transforms
+    test_transform = A.Compose([
+        A.Resize(args.size, args.size),
+        A.Normalize(mean=NORMALIZATION_STATS[0], std=NORMALIZATION_STATS[1]),
+        ToTensorV2(),
+    ])
+
+    return train_transform, test_transform
+
+class AlbumentationsDataset(torch.utils.data.Dataset):
+    def __init__(self, root, transform=None):
+        self.dataset = datasets.ImageFolder(root=root)
+        self.transform = transform
+        self.classes = self.dataset.classes
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        img, label = self.dataset[idx]
+        # Convert PIL image to numpy array
+        img = np.array(img)
+        
+        # Always apply transforms to ensure consistent size
+        if self.transform:
+            transformed = self.transform(image=img)
+            img = transformed["image"]
+        else:
+            # If no transform provided, at least ensure consistent size
+            img = cv2.resize(img, (512, 512))
+            img = torch.from_numpy(img).float()
+            if img.ndim == 2:
+                img = img.unsqueeze(0)
+            elif img.ndim == 3 and img.shape[0] != 3:
+                img = img.permute(2, 0, 1)
+        
+        return img, label
+
 def main():
     # Start timing
     start_time = time.time()
@@ -229,12 +331,13 @@ def main():
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size for training')
     parser.add_argument('--pin-memory', action='store_true', help='Use pinned memory for faster data transfer to GPU')
     parser.add_argument('--amp', action='store_true', help='Use automatic mixed precision training')
+    parser.add_argument('--max-epochs', type=int, default=100, help='Maximum number of training epochs')
     args = parser.parse_args()
 
     batch_size = args.batch_size
     divfac = 4
     best_epoch = 0
-    MAX_EPOCHS = 100
+    MAX_EPOCHS = args.max_epochs
     NUM_WORKERS = 16
     NUM_WORKERS_TEST = 4
 
@@ -258,71 +361,12 @@ def main():
 
     print("threads %d" % (torch.get_num_threads()))
 
-    # Define base transformations
-    if args.augmentation:
-        base_transforms = [
-            transforms.CenterCrop((2048, 2048)),
-            ResizeWithPadding(args.size),
-            transforms.RandomRotation(270),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-            transforms.ToTensor(),
-            transforms.Normalize(*NORMALIZATION_STATS),
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.1), ratio=(0.3, 3.3), value='random')
-        ]
-    else:
-        base_transforms = [
-            transforms.CenterCrop((2048, 2048)),
-            ResizeWithPadding(args.size),
-            transforms.ToTensor(),
-            transforms.Normalize(*NORMALIZATION_STATS)
-        ]
-
-    # Add CLAHE transformation if requested
-    if args.clahe:
-      print("Using CLAHE preprocessing")
-      def clahe_transform(img):
-        img = np.array(img)
-        if len(img.shape) == 2:  # Grayscale
-          clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-          img = clahe.apply(img)
-        else:  # Color
-          lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
-          l, a, b = cv2.split(lab)
-          clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-          l = clahe.apply(l)
-          lab = cv2.merge((l,a,b))
-          img = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
-        return Image.fromarray(img)
-      
-      base_transforms.insert(0, transforms.Lambda(clahe_transform))
-
-    # Add grayscale transformation if requested
-    if args.grayscale:
-      base_transforms.insert(0, transforms.Grayscale(num_output_channels=3))
-
-    xfm3 = transforms.Compose(base_transforms)
-
-    # Define test transformations
-    test_transforms = [
-      transforms.CenterCrop((2048, 2048)),
-      transforms.Resize((args.size, args.size)),
-      transforms.ToTensor(),
-      transforms.Normalize(*NORMALIZATION_STATS)
-    ]
-
-    # Add CLAHE transformation for test if requested
-    if args.clahe:
-      test_transforms.insert(0, transforms.Lambda(clahe_transform))
-
-    # Add grayscale transformation for test if requested
-    if args.grayscale:
-      test_transforms.insert(0, transforms.Grayscale(num_output_channels=3))
-
-    xfm_test2 = transforms.Compose(test_transforms)
-
-    train_dataset = datasets.ImageFolder(root='data/train', transform=xfm3)
-
-    test_dataset = datasets.ImageFolder(root='data/test', transform=xfm_test2)
+    # Get transforms
+    train_transform, test_transform = get_transforms(args)
+    
+    # Create datasets with albumentations
+    train_dataset = AlbumentationsDataset(root='data/train', transform=train_transform)
+    test_dataset = AlbumentationsDataset(root='data/test', transform=test_transform)
 
     if args.balanced:
         # Create oversampling sampler
@@ -368,7 +412,7 @@ def main():
     elif args.model == 'resnet18' and args.pretrained:
         classifier = ImageResNetTransferClassifier(num_classes=total_classes)
     elif args.model == 'resnet18':
-        classifier = ResNet18(num_classes=total_classes, pretrained=args.pretrained)
+        classifier = ResNet18(num_classes=total_classes, pretrained=args.pretrained, dropout_rate=0.2)
     else:
         raise ValueError(f"Unsupported model: {args.model}")
 
@@ -401,8 +445,28 @@ def main():
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
-    optimizer = optim.AdamW(classifier.parameters(), lr=0.0001, weight_decay=0.0005)
-    # scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
+    optimizer = AdamW(classifier.parameters(), lr=0.001, weight_decay=0.01)
+    
+    # Initialize learning rate scheduler
+    steps_per_epoch = len(trainloader)
+    scheduler = OneCycleLR(
+        optimizer,
+        max_lr=0.001,
+        epochs=MAX_EPOCHS,
+        steps_per_epoch=steps_per_epoch,
+        pct_start=0.3,  # 30% of training for warmup
+        div_factor=25,  # initial_lr = max_lr/25
+        final_div_factor=1e4  # final_lr = initial_lr/1e4
+    )
+
+    # Initialize SWA model
+    swa_model = AveragedModel(classifier)
+    swa_start = int(MAX_EPOCHS * 0.75)  # Start SWA at 75% of training
+    swa_scheduler = SWALR(optimizer, swa_lr=0.0001)
+
+    # Initialize mixed precision training
+    scaler = GradScaler()
+
     # Initialize TensorBoard writer
     writer = SummaryWriter()
 
@@ -485,106 +549,82 @@ def main():
 
     best_accuracy = test_model(0)
 
-    # Initialize mixed precision training if enabled
-    scaler = GradScaler('cuda') if args.amp else None
-
-    # Start model training
-    for epoch in tqdm.tqdm(range(MAX_EPOCHS)):  # loop over the dataset multiple times
+    # Training loop
+    for epoch in tqdm.tqdm(range(MAX_EPOCHS)):
         running_loss = 0.0
         classifier.train()
-        success = 0
-        failure = 0
-        for i, row_data in tqdm.tqdm(enumerate(trainloader, 0)):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = row_data[0].to(device), row_data[1].to(device)
-
-            # zero the parameter gradients
+        
+        for i, (inputs, labels) in enumerate(trainloader):
+            inputs, labels = inputs.to(device), labels.to(device)
+            
+            # Zero gradients
             optimizer.zero_grad()
-
-            if args.amp:
-                # Use automatic mixed precision
-                with autocast('cuda'):
-                    outputs = classifier(inputs)
-                    loss = criterion(outputs, labels)
-                
-                # Scale loss and backpropagate
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                # Regular training
+            
+            # Forward pass with mixed precision
+            with autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
                 outputs = classifier(inputs)
                 loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-
-            # print statistics
+                
+                # Add L2 regularization
+                l2_lambda = 0.01
+                l2_reg = torch.tensor(0., device=device)
+                for param in classifier.parameters():
+                    l2_reg += torch.norm(param)
+                loss += l2_lambda * l2_reg
+            
+            # Backward pass with gradient scaling
+            scaler.scale(loss).backward()
+            
+            # Gradient clipping
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(classifier.parameters(), max_norm=1.0)
+            
+            # Optimizer step with scaling
+            scaler.step(optimizer)
+            scaler.update()
+            
+            # Update learning rate
+            scheduler.step()
+            
+            # Update SWA model
+            if epoch >= swa_start:
+                swa_model.update_parameters(classifier)
+                swa_scheduler.step()
+            
             running_loss += loss.item()
-            # print every 10 mini-batches
+            
             if i % 10 == 9:
-                print('[%d, %5d]  loss: %.3f best: %.3f@%d ' %
-                    (epoch + 1, i + 1, running_loss / 10,  best_accuracy, best_epoch))
-                # Log training metrics to TensorBoard
+                print(f'[{epoch + 1}, {i + 1}] loss: {running_loss / 10:.3f}')
                 writer.add_scalar('Train/Loss', running_loss / 10, epoch * len(trainloader) + i)
                 running_loss = 0.0
-
-        # Calculate training accuracy
-        train_success = 0
-        train_total = 0
-        classifier.eval()
-        with torch.no_grad():
-            for inputs, labels in trainloader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = classifier(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                train_total += labels.size(0)
-                train_success += (predicted == labels).sum().item()
-        train_accuracy = train_success / train_total
         
-        # Store training metrics
-        train_losses.append(running_loss / len(trainloader))
-        train_accs.append(train_accuracy)
-
-        # scheduler.step()
+        # Evaluate model
         accuracy = test_model(epoch)
-        if (accuracy > best_accuracy):
+        
+        # Save best model
+        if accuracy > best_accuracy:
             best_accuracy = accuracy
             best_epoch = epoch
-            print("best accuracy %f" % (accuracy))
-            best_accuracy = accuracy
+            print(f"New best accuracy: {accuracy:.3f}")
             classifier.save_weights(PATH)
-            if args.grayscale:
-                with open('model_grayscale.txt', 'w') as the_file:
-                    current_date = datetime.datetime.now()
-                    the_file.write(f"Version: {current_date.strftime('%Y%m%d%H%M%S')}\n")
-                    the_file.write(f"Model Name: {args.name}\n")
-                    the_file.write(f"Model Type: {args.model}\n")
-                    the_file.write(f"Input Size: {args.size}x{args.size}\n")
-                    the_file.write(f"Model Description: {args.description}\n")
-                    the_file.write(f"PyTorch Version: {torch.__version__}\n")
-                    the_file.write(f"Generated Date: {current_date.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                    the_file.write(f"Best Accuracy: {accuracy:.3f}@Epoch {epoch}\n")
-                    the_file.write(f"Normalization Stats: {NORMALIZATION_STATS}\n")
-                    the_file.write(f"Grayscale: True\n")
-            else:
-                with open('model.txt', 'w') as the_file:
-                    current_date = datetime.datetime.now()
-                    the_file.write(f"Version: {current_date.strftime('%Y%m%d%H%M%S')}\n")
-                    the_file.write(f"Model Name: {args.name}\n")
-                    the_file.write(f"Model Type: {args.model}\n")
-                    the_file.write(f"Input Size: {args.size}x{args.size}\n")
-                    the_file.write(f"Model Description: {args.description}\n")
-                    the_file.write(f"PyTorch Version: {torch.__version__}\n")
-                    the_file.write(f"Generated Date: {current_date.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                    the_file.write(f"Best Accuracy: {accuracy:.3f}@Epoch {epoch}\n")
-                    the_file.write(f"Normalization Stats: {NORMALIZATION_STATS}\n")
-                    the_file.write(f"Grayscale: False\n")
-
-        # Plot curves if requested
-        if args.plot:
-            plot_metrics(train_losses, test_losses, train_accs, test_accs)
-
-    print('Finished Training. Best accuracy %.3f' % (best_accuracy))
+            
+            # Save SWA model if we're past the start epoch
+            if epoch >= swa_start:
+                torch.save(swa_model.state_dict(), f"{PATH}.swa")
+    
+    # Update batch normalization statistics for the SWA model
+    if epoch >= swa_start:
+        # Move SWA model to the same device as the classifier
+        swa_model = swa_model.to(device)
+        # Update batch normalization statistics
+        swa_model.train()  # Set to training mode for BN update
+        with torch.no_grad():
+            for inputs, _ in trainloader:
+                inputs = inputs.to(device)
+                swa_model(inputs)
+        torch.save(swa_model.state_dict(), f"{PATH}.swa.final")
+    
+    print(f'Finished Training. Best accuracy: {best_accuracy:.3f}')
     
     # Calculate and print total training time
     end_time = time.time()

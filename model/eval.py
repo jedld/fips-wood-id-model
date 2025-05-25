@@ -24,6 +24,8 @@ import json
 import ast
 from collections import defaultdict
 from itertools import combinations
+import os
+import pandas as pd
 
 from torchsummary import summary
 NORMALIZATION_STATS = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
@@ -66,6 +68,8 @@ parser.add_option("-g", "--grayscale", dest="grayscale", default=False,
                   help="use grayscale images")
 parser.add_option("-m", "--model_txt", dest="model_txt", default="model.txt",
                   help="path to model.txt file", metavar="FILE")
+parser.add_option("-o", "--output", dest="output_file", default="class_performance_report.png",
+                  help="path to save the performance report", metavar="FILE")
 
 (options, args) = parser.parse_args()
 
@@ -468,6 +472,110 @@ def test_model(epoch):
         with open("classification_report.txt", "w") as file:
             file.write(report)
     
-    return accuracy
+    return accuracy, all_labels, all_preds
 
-test_model(0)
+def generate_performance_report(y_true, y_pred, classes, output_file='class_performance_report.png'):
+    """
+    Generate a comprehensive performance report with visualizations.
+    Each visualization is saved as a separate high-quality image.
+    
+    Args:
+        y_true: List of true labels
+        y_pred: List of predicted labels
+        classes: List of class names
+        output_file: Base path for output files (without extension)
+    """
+    # Calculate metrics
+    report = classification_report(y_true, y_pred, target_names=classes, output_dict=True)
+    conf_matrix = confusion_matrix(y_true, y_pred)
+    
+    # Remove extension from output_file to use as base name
+    base_output = os.path.splitext(output_file)[0]
+    
+    # 1. Confusion Matrix Heatmap
+    plt.figure(figsize=(15, 12))
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
+                xticklabels=classes, yticklabels=classes)
+    plt.title('Confusion Matrix', fontsize=14, pad=20)
+    plt.xlabel('Predicted', fontsize=12)
+    plt.ylabel('True', fontsize=12)
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    plt.savefig(f'{base_output}_confusion_matrix.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 2. Per-class Metrics Bar Plot
+    plt.figure(figsize=(15, 8))
+    metrics_df = pd.DataFrame(report).transpose()
+    metrics_df = metrics_df.drop('support', axis=1)
+    metrics_df.plot(kind='bar')
+    plt.title('Per-class Metrics', fontsize=14, pad=20)
+    plt.xlabel('Class', fontsize=12)
+    plt.ylabel('Score', fontsize=12)
+    plt.legend(['Precision', 'Recall', 'F1-score'], fontsize=10)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(f'{base_output}_metrics.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 3. Class Distribution
+    plt.figure(figsize=(15, 8))
+    class_counts = pd.Series(y_true).value_counts()
+    class_counts.plot(kind='bar')
+    plt.title('Class Distribution', fontsize=14, pad=20)
+    plt.xlabel('Class', fontsize=12)
+    plt.ylabel('Number of Samples', fontsize=12)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(f'{base_output}_distribution.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 4. Performance Summary
+    plt.figure(figsize=(10, 6))
+    plt.axis('off')
+    summary_text = f"""
+    Overall Performance:
+    Accuracy: {report['accuracy']:.3f}
+    Macro Avg F1: {report['macro avg']['f1-score']:.3f}
+    Weighted Avg F1: {report['weighted avg']['f1-score']:.3f}
+    
+    Best Performing Classes:
+    {', '.join(sorted(classes, key=lambda x: report[x]['f1-score'], reverse=True)[:3])}
+    
+    Most Challenging Classes:
+    {', '.join(sorted(classes, key=lambda x: report[x]['f1-score'])[:3])}
+    """
+    plt.text(0.1, 0.5, summary_text, fontsize=14, va='center')
+    plt.tight_layout()
+    plt.savefig(f'{base_output}_summary.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Save detailed metrics to CSV
+    metrics_df.to_csv(f'{base_output}_metrics.csv')
+    
+    print(f"Performance visualizations saved as:")
+    print(f"- {base_output}_confusion_matrix.png")
+    print(f"- {base_output}_metrics.png")
+    print(f"- {base_output}_distribution.png")
+    print(f"- {base_output}_summary.png")
+    print(f"Detailed metrics saved to {base_output}_metrics.csv")
+    
+    return report
+
+def main():
+    accuracy, all_labels, all_preds = test_model(0)
+
+    # Generate performance report
+    report = generate_performance_report(
+        all_labels,
+        all_preds,
+        test_dataset.classes,
+        options.output_file
+    )
+    
+    print(f"Performance report saved to {options.output_file}")
+    print(f"Detailed metrics saved to class_metrics.csv")
+
+if __name__ == "__main__":
+    main()

@@ -1,10 +1,10 @@
-Version: 20250524110534
+Version: 20250524130510
 Model Name: mobilenet-v2-20250524
 Model Type: mobilenet
 Input Size: 512x512
 Model Description: Wood Identification Model
 PyTorch Version: 2.5.1+cu124
-Generated Date: 2025-05-24 11:05:34
-Best Accuracy: 0.888@Epoch 10
+Generated Date: 2025-05-24 13:05:10
+Best Accuracy: 0.928@Epoch 67
 Normalization Stats: ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 Grayscale: False

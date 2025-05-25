@@ -1,0 +1,35 @@
+,precision,recall,f1-score
+acacia_auriculiformis,1.0,0.6666666666666666,0.8
+acacia_mangium,1.0,1.0,1.0
+acer_saccharum,1.0,1.0,1.0
+dipterocarpus_grandiflorus,1.0,1.0,1.0
+endospermum_peltatum,0.8571428571428571,0.6666666666666666,0.75
+eucalyptus_camaldulensis,0.9,1.0,0.9473684210526315
+falcataria_falcata,1.0,0.3333333333333333,0.5
+fraxinus_americana,1.0,0.75,0.8571428571428571
+gmelina_arborea,0.7,0.7777777777777778,0.7368421052631579
+hevea_brasiliensis,0.75,1.0,0.8571428571428571
+instia_bijuga,1.0,1.0,1.0
+juglans_nigra,0.8181818181818182,1.0,0.9
+juglans_regia,1.0,1.0,1.0
+leucaena_leucocephala,0.75,1.0,0.8571428571428571
+palosapis,1.0,1.0,1.0
+parashorea_malaanonan,1.0,1.0,1.0
+pometia_pinnata,1.0,1.0,1.0
+pterocarpus_indicus,0.8181818181818182,1.0,0.9
+quercus_robur,1.0,0.7777777777777778,0.875
+samanea_saman,0.875,0.875,0.875
+shorea_albida,1.0,1.0,1.0
+shorea_astylosa,1.0,1.0,1.0
+shorea_contorta,1.0,1.0,1.0
+shorea_negrosensis,0.5294117647058824,1.0,0.6923076923076923
+shorea_ovata,1.0,1.0,1.0
+shorea_palosapis,0.0,0.0,0.0
+shorea_parvifolia,1.0,1.0,1.0
+shorea_polysperma,0.18181818181818182,0.2222222222222222,0.2
+swietenia_macrophylla,1.0,0.8181818181818182,0.9
+tectona_grandis,1.0,1.0,1.0
+vitex_parviflora,1.0,0.7777777777777778,0.875
+accuracy,0.8804347826086957,0.8804347826086957,0.8804347826086957
+macro avg,0.8767656916138891,0.8601743238840013,0.8555789287113564
+weighted avg,0.9012414056531703,0.8804347826086957,0.8775469191373083
