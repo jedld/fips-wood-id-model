@@ -16,6 +16,7 @@ from torch.amp import autocast, GradScaler
 from mobilenet import MobileNetV2TransferClassifier
 from stn_model import MinimalCNN
 from Resnet18 import ResNet18
+from efficientnet import EfficientNetTransferClassifier
 import torchvision
 from torchvision import datasets
 import tqdm
@@ -318,21 +319,48 @@ def main():
     # Add command line arguments
     parser = argparse.ArgumentParser(description='Train a wood identification model')
     parser.add_argument('--grayscale', default=False, help='Use grayscale images instead of color')
-    parser.add_argument('--augmentation', default=False, help='Use augmentation')
+    parser.add_argument('--augmentation', default=True, help='Use augmentation')
     parser.add_argument('--pretrained', default=True, help='Use pretrained model')
-    parser.add_argument('--model', default='mobilenet', help='Model to use')
+    parser.add_argument('--model', default='efficientnet', help='Model to use')
     parser.add_argument('--clahe', action='store_true', help='Use CLAHE preprocessing')
     parser.add_argument('--plot', action='store_true', help='Plot training curves')
     parser.add_argument('--size', type=int, default=512, help='Input size (512 or 1024)', metavar='SIZE')
-    parser.add_argument('--name', default=f"mobilenet-v2-{datetime.datetime.now().strftime('%Y%m%d')}", help='Name of the model')
+    parser.add_argument('--name', default=None, help='Name of the model')
     parser.add_argument('--description', default="Wood Identification Model", help='Description of the model')
     parser.add_argument('--balanced', action='store_true', help='Use oversampling to balance the dataset')
     parser.add_argument('--oversample-factor', type=float, default=2.0, help='Factor to oversample minority classes')
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size for training')
     parser.add_argument('--pin-memory', action='store_true', help='Use pinned memory for faster data transfer to GPU')
     parser.add_argument('--amp', action='store_true', help='Use automatic mixed precision training')
-    parser.add_argument('--max-epochs', type=int, default=100, help='Maximum number of training epochs')
+    parser.add_argument('--max-epochs', type=int, default=200, help='Maximum number of training epochs')
     args = parser.parse_args()
+
+    # Generate model name with timestamp if not provided
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    if args.name is None:
+        args.name = f"{args.model}_{timestamp}"
+    
+    # Create checkpoint directory
+    checkpoint_dir = Path("checkpoints")
+    checkpoint_dir.mkdir(exist_ok=True)
+    
+    # Define checkpoint paths
+    checkpoint_path = checkpoint_dir / f"{args.name}.pth"
+    model_info_path = checkpoint_dir / f"{args.name}.txt"
+    
+    # Save model information
+    with open(model_info_path, 'w') as f:
+        f.write(f"Model Type: {args.model}\n")
+        f.write(f"Input Size: {args.size}x{args.size}\n")
+        f.write(f"Grayscale: {args.grayscale}\n")
+        f.write(f"Normalization Stats: {NORMALIZATION_STATS}\n")
+        f.write(f"Created: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Description: {args.description}\n")
+        f.write(f"Pretrained: {args.pretrained}\n")
+        f.write(f"Augmentation: {args.augmentation}\n")
+        f.write(f"Balanced Dataset: {args.balanced}\n")
+        f.write(f"Batch Size: {args.batch_size}\n")
+        f.write(f"Mixed Precision: {args.amp}\n")
 
     batch_size = args.batch_size
     divfac = 4
@@ -413,6 +441,8 @@ def main():
         classifier = ImageResNetTransferClassifier(num_classes=total_classes)
     elif args.model == 'resnet18':
         classifier = ResNet18(num_classes=total_classes, pretrained=args.pretrained, dropout_rate=0.2)
+    elif args.model == 'efficientnet':
+        classifier = EfficientNetTransferClassifier(num_classes=total_classes, pretrained=args.pretrained)
     else:
         raise ValueError(f"Unsupported model: {args.model}")
 
@@ -606,11 +636,15 @@ def main():
             best_accuracy = accuracy
             best_epoch = epoch
             print(f"New best accuracy: {accuracy:.3f}")
-            classifier.save_weights(PATH)
+            classifier.save_weights(checkpoint_path)
+            
+            # Update model info with best accuracy
+            with open(model_info_path, 'a') as f:
+                f.write(f"Best Accuracy: {accuracy:.3f} at epoch {epoch}\n")
             
             # Save SWA model if we're past the start epoch
             if epoch >= swa_start:
-                torch.save(swa_model.state_dict(), f"{PATH}.swa")
+                torch.save(swa_model.state_dict(), f"{checkpoint_path}.swa")
     
     # Update batch normalization statistics for the SWA model
     if epoch >= swa_start:
@@ -622,7 +656,7 @@ def main():
             for inputs, _ in trainloader:
                 inputs = inputs.to(device)
                 swa_model(inputs)
-        torch.save(swa_model.state_dict(), f"{PATH}.swa.final")
+        torch.save(swa_model.state_dict(), f"{checkpoint_path}.swa.final")
     
     print(f'Finished Training. Best accuracy: {best_accuracy:.3f}')
     

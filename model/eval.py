@@ -20,12 +20,15 @@ from optparse import OptionParser
 from stn_model import MinimalCNN
 from Resnet18 import ResNet18
 from mobilenet import MobileNetV2TransferClassifier
+from efficientnet import EfficientNetTransferClassifier
 import json
 import ast
 from collections import defaultdict
 from itertools import combinations
 import os
 import pandas as pd
+import cv2
+from torch.nn import functional as F
 
 from torchsummary import summary
 NORMALIZATION_STATS = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
@@ -62,28 +65,57 @@ def parse_model_txt(model_txt_path):
 parser = OptionParser()
 parser.add_option("-t", "--test_folder", dest="test_folder", default="data/test",
                   help="path to the test folder", metavar="FOLDER")
-parser.add_option("-w", "--weights_file", dest="weights_file", default="checkpoint.pth",
+parser.add_option("-w", "--weights_file", dest="weights_file", default=None,
                   help="path to the model weights file", metavar="FILE")
 parser.add_option("-g", "--grayscale", dest="grayscale", default=False,
                   help="use grayscale images")
-parser.add_option("-m", "--model_txt", dest="model_txt", default="model.txt",
+parser.add_option("-m", "--model_txt", dest="model_txt", default=None,
                   help="path to model.txt file", metavar="FILE")
+parser.add_option("-M", "--model", dest="model", default="efficientnet",
+                  help="model to use", metavar="MODEL")
 parser.add_option("-o", "--output", dest="output_file", default="class_performance_report.png",
                   help="path to save the performance report", metavar="FILE")
+parser.add_option("-c", "--checkpoint", dest="checkpoint", default=None,
+                  help="checkpoint name (without extension) to use", metavar="NAME")
+parser.add_option("-s", "--swa", dest="use_swa", default=False,
+                  help="use SWA model weights", metavar="BOOL")
 
 (options, args) = parser.parse_args()
 
 # Default values
 test_folder = options.test_folder
-weights_file = options.weights_file
+
+# Handle checkpoint and model info paths
+if options.checkpoint:
+    checkpoint_dir = Path("checkpoints")
+    weights_file = checkpoint_dir / f"{options.checkpoint}.pth"
+    if options.use_swa:
+        weights_file = checkpoint_dir / f"{options.checkpoint}.pth.swa.final"
+    model_txt = checkpoint_dir / f"{options.checkpoint}.txt"
+else:
+    weights_file = options.weights_file
+    model_txt = options.model_txt
+
+if weights_file is None:
+    print("Error: Either --weights_file or --checkpoint must be specified")
+    sys.exit(1)
 
 # Read settings from model.txt
-settings = parse_model_txt(options.model_txt)
+settings = parse_model_txt(model_txt)
 
 # Use settings from model.txt if available, otherwise use defaults
 is_grayscale = settings.get('grayscale', options.grayscale)
 normalization_stats = settings.get('normalization_stats', NORMALIZATION_STATS)
-model_type = settings.get('model_type', 'mobilenet')
+model_type = settings.get('model_type', options.model)
+
+# Print model information
+print("\nModel Information:")
+print("=================")
+if Path(model_txt).exists():
+    with open(model_txt, 'r') as f:
+        print(f.read())
+print("=================\n")
+print(f"Using {'SWA' if options.use_swa else 'regular'} model weights")
 
 batch_size = 35
 divfac = 4
@@ -132,6 +164,8 @@ elif model_type == 'mobilenet':
     classifier = MobileNetV2TransferClassifier(num_classes=len(test_dataset.classes))
 elif model_type == 'resnet18':
     classifier = ImageResNetTransferClassifier(num_classes=len(test_dataset.classes))
+elif model_type == 'efficientnet':
+    classifier = EfficientNetTransferClassifier(num_classes=len(test_dataset.classes))
 else:
     print(f"Warning: Unknown model type {model_type}, defaulting to MobileNetV2")
     classifier = MobileNetV2TransferClassifier(num_classes=len(test_dataset.classes))
@@ -369,6 +403,145 @@ def plot_confused_images(inputs, true_labels, pred_labels, class_names, test_dat
             plt.close()
             print(f"Saved confusion plot to {output_file}")
 
+class GradCAM:
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.target_layer = target_layer
+        self.gradients = None
+        self.activations = None
+        
+        # Register hooks
+        target_layer.register_forward_hook(self.save_activation)
+        target_layer.register_full_backward_hook(self.save_gradient)
+    
+    def save_activation(self, module, input, output):
+        self.activations = output
+    
+    def save_gradient(self, module, grad_input, grad_output):
+        self.gradients = grad_output[0]
+    
+    def __call__(self, x, index=None):
+        # Enable gradient computation
+        x.requires_grad_(True)
+        
+        # Forward pass
+        output = self.model(x)
+        
+        if index is None:
+            index = output.argmax(dim=1)
+        
+        # Zero gradients
+        self.model.zero_grad()
+        
+        # Create one-hot encoding for the target class
+        one_hot = torch.zeros_like(output)
+        one_hot[0][index] = 1
+        
+        # Backward pass
+        output.backward(gradient=one_hot, retain_graph=True)
+        
+        # Get gradients and activations
+        gradients = self.gradients.detach().cpu()
+        activations = self.activations.detach().cpu()
+        
+        # Global average pooling of gradients
+        weights = torch.mean(gradients, dim=(2, 3))
+        
+        # Create weighted activation map
+        cam = torch.zeros(activations.shape[2:], dtype=torch.float32)
+        for i, w in enumerate(weights[0]):
+            cam += w * activations[0, i, :, :]
+        
+        # Apply ReLU and normalize
+        cam = F.relu(cam)
+        cam = F.interpolate(cam.unsqueeze(0).unsqueeze(0), 
+                          size=x.shape[2:], 
+                          mode='bilinear', 
+                          align_corners=False)
+        cam = cam.squeeze().numpy()
+        cam = (cam - cam.min()) / (cam.max() - cam.min())
+        
+        return cam
+
+def get_target_layer(model, model_type):
+    if model_type == 'mobilenet':
+        return model.model.features[-1]
+    elif model_type == 'resnet18':
+        return model.model.layer4[-1]
+    elif model_type == 'efficientnet':
+        return model.model.conv_head
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+
+def visualize_gradcam(model, input_tensor, original_image, class_idx, model_type, true_class, pred_class, confidence, save_path=None):
+    # Get target layer for Grad-CAM
+    target_layer = get_target_layer(model, model_type)
+    
+    # Initialize Grad-CAM
+    grad_cam = GradCAM(model, target_layer)
+    
+    # Generate heatmap
+    heatmap = grad_cam(input_tensor, class_idx)
+    
+    # Convert heatmap to RGB using a red color scheme
+    heatmap = np.uint8(255 * heatmap)
+    # Create a custom red colormap (dark red to light red)
+    red_cmap = np.zeros((256, 1, 3), dtype=np.uint8)
+    red_cmap[:, 0, 0] = np.linspace(0, 255, 256)  # Red channel
+    red_cmap[:, 0, 1] = np.linspace(0, 200, 256)  # Green channel
+    red_cmap[:, 0, 2] = np.linspace(0, 200, 256)  # Blue channel
+    red_cmap = cv2.applyColorMap(red_cmap, cv2.COLORMAP_HOT)
+    red_cmap = red_cmap.reshape(256, 3)
+    
+    # Apply the custom colormap
+    heatmap_rgb = np.zeros((heatmap.shape[0], heatmap.shape[1], 3), dtype=np.uint8)
+    for i in range(3):
+        heatmap_rgb[:, :, i] = red_cmap[heatmap, i]
+    
+    # Convert original image to numpy array
+    # denormalize the original image from resnet stats
+    original_image = original_image.detach().cpu().squeeze().permute(1, 2, 0).numpy()
+    original_image = original_image * normalization_stats[1] + normalization_stats[0]
+    original_image = (original_image * 255).astype(np.uint8)
+    
+    # Resize heatmap to match original image
+    heatmap_rgb = cv2.resize(heatmap_rgb, (original_image.shape[1], original_image.shape[0]))
+    
+    # Blend heatmap with original image
+    alpha = 0.6
+    output = cv2.addWeighted(original_image, 1-alpha, heatmap_rgb, alpha, 0)
+    
+    # Create figure
+    plt.figure(figsize=(15, 5))
+    
+    # Plot original image (without any overlay)
+    plt.subplot(1, 3, 1)
+    plt.imshow(original_image)
+    plt.title(f'Original Image\nTrue: {true_class}', fontsize=10)
+    plt.axis('off')
+    
+    # Plot heatmap
+    plt.subplot(1, 3, 2)
+    plt.imshow(heatmap_rgb)
+    plt.title('Grad-CAM Heatmap\nDark Red = Most Important', fontsize=10)
+    plt.axis('off')
+    
+    # Plot blended image (heatmap overlay)
+    plt.subplot(1, 3, 3)
+    plt.imshow(output)
+    plt.title(f'Heatmap Overlay\nPred: {pred_class}\nConf: {confidence:.2%}', fontsize=10)
+    plt.axis('off')
+    
+    # Add overall title
+    plt.suptitle(f'True: {true_class} → Pred: {pred_class} (Conf: {confidence:.2%})', 
+                fontsize=12, y=1.05)
+    
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
 def test_model(epoch):
     test_loss = 0.0
     total_items = 0
@@ -381,36 +554,66 @@ def test_model(epoch):
     all_true_labels = []
     all_pred_labels = []
     
-    for _, data in enumerate(testloader):
+    # Create directory for Grad-CAM visualizations
+    gradcam_dir = Path("gradcam_visualizations")
+    gradcam_dir.mkdir(exist_ok=True)
+    
+    # Create subdirectories for each class
+    for class_name in test_dataset.classes:
+        class_dir = gradcam_dir / class_name
+        class_dir.mkdir(exist_ok=True)
+    
+    for batch_idx, data in enumerate(testloader):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data[0].to(device), data[1].to(device)
         label_indexes = data[1].numpy()
-        with torch.set_grad_enabled(False):
+        
+        # Enable gradient computation for Grad-CAM
+        inputs.requires_grad_(True)
+        
+        with torch.set_grad_enabled(True):  # Enable gradients for Grad-CAM
             outputs = classifier(inputs)
             loss = criterion(outputs, labels)
             test_loss += loss.item()
             total_items += 1
 
             for i2, out in enumerate(outputs):
-                topk = torch.topk(out, len(test_dataset.classes))
+                # Get top prediction and confidence
+                probs = F.softmax(out, dim=0)
+                topk = torch.topk(probs, len(test_dataset.classes))
+                pred_idx = topk.indices[0].item()
+                confidence = topk.values[0].item()
+                
                 expected = test_dataset.classes[label_indexes[i2]]
-                index = topk.indices.cpu().numpy()[0]
-
-                if index >= len(test_dataset.classes):
-                    index = len(test_dataset.classes) - 1
-                    print("Index out of bounds: ", index)
-
-                actual = test_dataset.classes[index]
+                actual = test_dataset.classes[pred_idx]
+                
                 all_labels.append(expected)
                 all_preds.append(actual)
-                all_inputs.append(inputs[i2])
+                all_inputs.append(inputs[i2].detach().cpu())
                 all_true_labels.append(label_indexes[i2])
-                all_pred_labels.append(index)
+                all_pred_labels.append(pred_idx)
+                
+                # Generate Grad-CAM visualization for each image
+                # Create descriptive filename with batch and image indices
+                filename = f"img_{batch_idx}_{i2}_true_{expected}_pred_{actual}_conf_{confidence:.2f}.png"
+                save_path = gradcam_dir / expected / filename
+                
+                visualize_gradcam(
+                    classifier,
+                    inputs[i2:i2+1],
+                    inputs[i2],
+                    pred_idx,
+                    model_type,
+                    expected,
+                    actual,
+                    confidence,
+                    save_path
+                )
                 
                 if expected == actual:
                     success += 1
                 else:
-                    print("%s -> %s" % (expected, actual))
+                    print(f"{expected} -> {actual} (Confidence: {confidence:.2%})")
                     failure += 1
 
     # Plot confused images

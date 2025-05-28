@@ -18,3 +18,4 @@ data/
 runs/
 generated_images/
 human_eval/
+gradcam_visualizations/
