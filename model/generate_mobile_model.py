@@ -26,7 +26,7 @@ parser.add_option("-n", "--name", dest="model_name", default=None,
                   help="name of the model", metavar="NAME")
 parser.add_option("-d", "--description", dest="model_description", default="Wood Identification Model",
                   help="description of the model", metavar="DESCRIPTION")
-parser.add_option("-t", "--type", dest="model_type", default=None,
+parser.add_option("-t", "--type", dest="model_type", default='efficientnet',
                   help="model type (mobilenet, resnet18, efficientnet)", metavar="TYPE")
 parser.add_option("-o", "--output", dest="output", default="model.zip")
 parser.add_option("-p", "--path", dest="path", default=".")
@@ -34,7 +34,7 @@ parser.add_option("-s", "--size", dest="input_size", default=512, type="int",
                   help="input size (512 or 1024)", metavar="SIZE")
 parser.add_option("--swa", dest="use_swa", default=False, action="store_true",
                   help="use SWA model weights", metavar="BOOL")
-parser.add_option("--checkpoint", dest="checkpoint", default=None,
+parser.add_option("--checkpoint", dest="checkpoint",
                   help="checkpoint name (without extension) to use", metavar="NAME")
 
 (options, args) = parser.parse_args()
@@ -102,28 +102,46 @@ if not options.model_name:
 
 # define and load the model here
 def load_model(class_labels_file_path, model_file_path, arch='mobilenet'):
-    with open(class_labels_file_path, 'r') as fh:
-        lines = [line.strip() for line in fh.readlines()]
+    """
+    Load the model and class labels.
     
-    if arch == 'resnet18':
-        cls = ImageResNetTransferClassifier(num_classes=len(lines))
+    Args:
+        class_labels_file_path (str): Path to the class labels file
+        model_file_path (str): Path to the model file
+        arch (str): Model architecture to use
+        
+    Returns:
+        tuple: (model, class_names)
+    """
+    # Load class labels
+    with open(class_labels_file_path, 'r') as f:
+        class_names = [line.strip() for line in f.readlines()]
+    print(f"class_names: {class_names}")
+    # Initialize model based on architecture
+    if arch == 'mobilenet':
+        model = MobileNetV2TransferClassifier(num_classes=len(class_names))
+    elif arch == 'resnet18':
+        model = ImageResNetTransferClassifier(num_classes=len(class_names))
     elif arch == 'efficientnet':
-        cls = EfficientNetTransferClassifier(num_classes=len(lines))
-    elif arch == 'mobilenet':
-        cls = MobileNetV2TransferClassifier(num_classes=len(lines))
+        model = EfficientNetTransferClassifier(num_classes=len(class_names))
     else:
-        raise ValueError(f"Unsupported model type: {arch}")
-
-    print(f"Loading model from {model_file_path}")
-    if model_file_path.endswith('.pt'):
-        cls = torch.jit.load(model_file_path)
+        raise ValueError(f"Unsupported architecture: {arch}")
+    
+    # Load model weights
+    if str(model_file_path).endswith('.pt'):
+        # Load TorchScript model
+        model = torch.jit.load(model_file_path)
     else:
-        cls.load_weights(Path(model_file_path))
-
-    return cls, lines
+        # Load PyTorch model
+        model.load_weights(model_file_path)
+    
+    model.eval()
+    return model, class_names
 
 # Load model and class
 class_labels_file_path = os.path.join(options.path, options.class_labels_file)
+print(f"class_labels_file_path: {class_labels_file_path}")
+print(f"model_file: {model_file}")
 classifier, classnames = load_model(class_labels_file_path, model_file, arch=options.model_type)
 classifier.eval()
 
@@ -135,8 +153,7 @@ print(f"Input Size: {options.input_size}x{options.input_size}")
 print(f"Using {'SWA' if options.use_swa else 'regular'} model weights")
 print(f"=================")
 
-divfac = 4
-resize_size = (options.input_size//divfac, options.input_size//divfac)
+resize_size = (options.input_size, options.input_size)
 xfm = transforms.Compose([
     ia.PadToEnsureSize(out_size=(options.input_size, options.input_size)),
     ia.Resize(out_size=resize_size),

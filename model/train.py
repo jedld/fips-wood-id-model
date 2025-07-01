@@ -332,7 +332,7 @@ def main():
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size for training')
     parser.add_argument('--pin-memory', action='store_true', help='Use pinned memory for faster data transfer to GPU')
     parser.add_argument('--amp', action='store_true', help='Use automatic mixed precision training')
-    parser.add_argument('--max-epochs', type=int, default=200, help='Maximum number of training epochs')
+    parser.add_argument('--max-epochs', type=int, default=100, help='Maximum number of training epochs')
     args = parser.parse_args()
 
     # Generate model name with timestamp if not provided

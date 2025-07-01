@@ -1,11 +1,7 @@
 Class Merge Suggestions
 ======================
 
-Suggestion: Merge ['shorea_palosapis', 'shorea_polysperma']
+Suggestion: Merge ['juglans_nigra', 'shorea_palosapis']
 Confusion Ratio: 50.00%
-Explanation: Classes 'shorea_palosapis' and 'shorea_polysperma' show high confusion (50.00%). Class 'shorea_palosapis' is confused as 'shorea_polysperma' 100.00% of the time, and 'shorea_polysperma' is confused as 'shorea_palosapis' 0.00% of the time.
-
-Suggestion: Merge ['acacia_auriculiformis', 'leucaena_leucocephala']
-Confusion Ratio: 33.33%
-Explanation: Classes 'acacia_auriculiformis' and 'leucaena_leucocephala' show high confusion (33.33%). Class 'acacia_auriculiformis' is confused as 'leucaena_leucocephala' 55.56% of the time, and 'leucaena_leucocephala' is confused as 'acacia_auriculiformis' 11.11% of the time.
+Explanation: Classes 'juglans_nigra' and 'shorea_palosapis' show high confusion (50.00%). Class 'juglans_nigra' is confused as 'shorea_palosapis' 0.00% of the time, and 'shorea_palosapis' is confused as 'juglans_nigra' 100.00% of the time.
 

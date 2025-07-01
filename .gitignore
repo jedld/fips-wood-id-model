@@ -12,10 +12,10 @@ data/
 *.zip
 *.json
 .venv/
-
-
-# tensorboard
 runs/
 generated_images/
 human_eval/
 gradcam_visualizations/
+checkpoints/
+confusion_analysis/
+fault_dataset/

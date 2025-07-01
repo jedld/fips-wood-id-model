@@ -200,6 +200,8 @@ def generate_dataset_report(data_dir, output_file='dataset_report.png', bar_char
     print(f"Mean Images per Class: {mean_count:.1f}")
     print(f"Std Dev of Images per Class: {std_count:.1f}")
 
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate dataset analysis report')
     parser.add_argument('--data-dir', default='data/train', help='Path to dataset directory')
@@ -208,6 +210,7 @@ def main():
     args = parser.parse_args()
     
     generate_dataset_report(args.data_dir, args.output_file, args.bar_chart_only)
+    generate_report('data')
 
 if __name__ == '__main__':
     main()

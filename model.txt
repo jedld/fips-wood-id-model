@@ -1,0 +1,7 @@
+Version: 20250529071238
+Model Name: efficientnet_20250529_071236
+Model Type: efficientnet
+Input Size: 512x512
+Model Description: Wood Identification Model
+PyTorch Version: 2.5.1+cu124
+Generated Date: 2025-05-29 07:12:38

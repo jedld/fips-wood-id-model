@@ -141,7 +141,6 @@ if is_grayscale:
     ])
 else:
     xfm_test = transforms.Compose([
-        transforms.CenterCrop((2048, 2048)),
         transforms.Resize(resize_size),
         transforms.ToTensor(),
         normalize
@@ -178,15 +177,15 @@ print(f"Normalization stats: {normalization_stats}")
 print(test_dataset.classes)
 
 if Path(weights_file).exists(): 
-  if weights_file.endswith('.pt'):
-    device = torch.device("cpu")
-    classifier = torch.jit.load(weights_file)
-  else:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    classifier.load_weights(Path(weights_file))
+    if str(weights_file).endswith('.pt'):
+        device = torch.device("cpu")
+        classifier = torch.jit.load(weights_file)
+    else:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        classifier.load_weights(Path(weights_file))
 else:
-  print("Weights file not found: ", weights_file)
-  sys.exit(1)
+    print("Weights file not found: ", weights_file)
+    sys.exit(1)
 
 
 print(device)
@@ -474,22 +473,17 @@ def get_target_layer(model, model_type):
         raise ValueError(f"Unsupported model type: {model_type}")
 
 def visualize_gradcam(model, input_tensor, original_image, class_idx, model_type, true_class, pred_class, confidence, save_path=None):
-    # Get target layer for Grad-CAM
     target_layer = get_target_layer(model, model_type)
-    
-    # Initialize Grad-CAM
     grad_cam = GradCAM(model, target_layer)
-    
-    # Generate heatmap
     heatmap = grad_cam(input_tensor, class_idx)
     
-    # Convert heatmap to RGB using a red color scheme
+
     heatmap = np.uint8(255 * heatmap)
-    # Create a custom red colormap (dark red to light red)
+
     red_cmap = np.zeros((256, 1, 3), dtype=np.uint8)
-    red_cmap[:, 0, 0] = np.linspace(0, 255, 256)  # Red channel
-    red_cmap[:, 0, 1] = np.linspace(0, 200, 256)  # Green channel
-    red_cmap[:, 0, 2] = np.linspace(0, 200, 256)  # Blue channel
+    red_cmap[:, 0, 0] = np.linspace(0, 255, 256)
+    red_cmap[:, 0, 1] = np.linspace(0, 200, 256)
+    red_cmap[:, 0, 2] = np.linspace(0, 200, 256)
     red_cmap = cv2.applyColorMap(red_cmap, cv2.COLORMAP_HOT)
     red_cmap = red_cmap.reshape(256, 3)
     
@@ -553,6 +547,7 @@ def test_model(epoch):
     all_inputs = []
     all_true_labels = []
     all_pred_labels = []
+    all_confidences = []
     
     # Create directory for Grad-CAM visualizations
     gradcam_dir = Path("gradcam_visualizations")
@@ -562,6 +557,17 @@ def test_model(epoch):
     for class_name in test_dataset.classes:
         class_dir = gradcam_dir / class_name
         class_dir.mkdir(exist_ok=True)
+    
+    # Fault detection metrics
+    fault_detection_metrics = {
+        'true_faults': 0,      # Actual fault images correctly identified
+        'false_faults': 0,     # Good images incorrectly classified as fault
+        'missed_faults': 0,    # Fault images missed
+        'total_faults': 0      # Total number of fault images in test set
+    }
+    
+    # Confidence threshold for fault detection
+    FAULT_CONFIDENCE_THRESHOLD = 0.6
     
     for batch_idx, data in enumerate(testloader):
         # get the inputs; data is a list of [inputs, labels]
@@ -587,11 +593,22 @@ def test_model(epoch):
                 expected = test_dataset.classes[label_indexes[i2]]
                 actual = test_dataset.classes[pred_idx]
                 
+                # Update fault detection metrics
+                if expected == 'fault':
+                    fault_detection_metrics['total_faults'] += 1
+                    if actual == 'fault':
+                        fault_detection_metrics['true_faults'] += 1
+                    else:
+                        fault_detection_metrics['missed_faults'] += 1
+                elif actual == 'fault':
+                    fault_detection_metrics['false_faults'] += 1
+                
                 all_labels.append(expected)
                 all_preds.append(actual)
                 all_inputs.append(inputs[i2].detach().cpu())
                 all_true_labels.append(label_indexes[i2])
                 all_pred_labels.append(pred_idx)
+                all_confidences.append(confidence)
                 
                 # Generate Grad-CAM visualization for each image
                 # Create descriptive filename with batch and image indices
@@ -629,9 +646,21 @@ def test_model(epoch):
     print('Test [%d] loss: %.3f Success: %d Failure: %d Accuracy: %.3f Total: %d' %
                 (epoch + 1, test_loss / total_items, success, failure, accuracy, success + failure))
     
+    # Print fault detection metrics
+    print("\nFault Detection Metrics:")
+    print("=======================")
+    print(f"Total fault images: {fault_detection_metrics['total_faults']}")
+    print(f"True faults detected: {fault_detection_metrics['true_faults']}")
+    print(f"False faults (good images marked as fault): {fault_detection_metrics['false_faults']}")
+    print(f"Missed faults: {fault_detection_metrics['missed_faults']}")
+    
+    if fault_detection_metrics['total_faults'] > 0:
+        fault_detection_rate = fault_detection_metrics['true_faults'] / fault_detection_metrics['total_faults']
+        print(f"Fault detection rate: {fault_detection_rate:.2%}")
+    
     # Compute confusion matrix
     cm = confusion_matrix(all_labels, all_preds, labels=test_dataset.classes)
-    print("Confusion Matrix:\n", cm)
+    print("\nConfusion Matrix:\n", cm)
     
     # Plot confusion matrix
     plt.figure(figsize=(10, 8))
@@ -666,8 +695,9 @@ def test_model(epoch):
     
     # Compute and print classification report
     report = classification_report(all_labels, all_preds, target_names=test_dataset.classes)
-    print("Classification Report:\n", report)
-    # write report to file
+    print("\nClassification Report:\n", report)
+    
+    # Save report to file
     if options.grayscale:
         with open("classification_report_grayscale.txt", "w") as file:
             file.write(report)
